@@ -1,0 +1,92 @@
+<html>
+
+<head>
+  <title>Context Doctor Settings</title>
+</head>
+
+<body>
+  <div x-data>
+    <template x-if="config">
+      <div>
+        <div class="section-title">Context Doctor</div>
+
+        <div class="section">
+          <div class="section-title">Output</div>
+
+          <div class="field">
+            <div class="field-label">
+              <div class="field-title">Indent size</div>
+              <div class="field-description">
+                Number of spaces for JSON indentation. Set to 0 for no
+                indentation.
+              </div>
+            </div>
+            <div class="field-control">
+              <input type="number" min="0" max="8" x-model.number="config.indent" />
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="field-label">
+              <div class="field-title">Minify instead of beautify</div>
+              <div class="field-description">
+                Output compact JSON with no whitespace. Overrides indent setting.
+              </div>
+            </div>
+            <div class="field-control">
+              <label class="toggle">
+                <input type="checkbox" x-model="config.minify" />
+                <span class="toggler"></span>
+              </label>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="section">
+          <div class="section-title">Repair</div>
+
+          <div class="field">
+            <div class="field-label">
+              <div class="field-title">Use standard mode</div>
+              <div class="field-description">
+                Use json_repair standard mode without schema guidance. When
+                disabled, salvage mode with A0 schema is used.
+              </div>
+            </div>
+            <div class="field-control">
+              <label class="toggle">
+                <input type="checkbox" x-model="config.use_standard_mode" />
+                <span class="toggler"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Log</div>
+
+          <div class="field">
+            <div class="field-label">
+              <div class="field-title">Update log content</div>
+              <div class="field-description">
+                Replace the View Details content shown in the WebUI log with
+                repaired JSON. Kvps and heading are always updated regardless
+                of this setting. Disable to keep raw model output in the log
+                for debugging.
+              </div>
+            </div>
+            <div class="field-control">
+              <label class="toggle">
+                <input type="checkbox" x-model="config.update_log" />
+                <span class="toggler"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+</body>
+
+</html>
