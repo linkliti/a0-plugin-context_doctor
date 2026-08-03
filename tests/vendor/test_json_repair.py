@@ -1,0 +1,319 @@
+import importlib
+import sys
+
+import pytest
+
+from src.json_repair.json_parser import JSONParser
+from src.json_repair.json_repair import loads, repair_json
+
+json_repair_module = importlib.import_module("src.json_repair.json_repair")
+
+
+def test_valid_json():
+    assert (
+        repair_json('{"name": "John", "age": 30, "city": "New York"}')
+        == '{"name": "John", "age": 30, "city": "New York"}'
+    )
+    assert repair_json('{"employees":["John", "Anna", "Peter"]} ') == '{"employees": ["John", "Anna", "Peter"]}'
+    assert repair_json('{"key": "value:value"}') == '{"key": "value:value"}'
+    assert repair_json('{"text": "The quick brown fox,"}') == '{"text": "The quick brown fox,"}'
+    assert repair_json('{"text": "The quick brown fox won\'t jump"}') == '{"text": "The quick brown fox won\'t jump"}'
+    assert repair_json('{"key": ""') == '{"key": ""}'
+    assert repair_json('{"key1": {"key2": [1, 2, 3]}}') == '{"key1": {"key2": [1, 2, 3]}}'
+    assert repair_json('{"key": 12345678901234567890}') == '{"key": 12345678901234567890}'
+    assert repair_json('{"key": "value\u263a"}') == '{"key": "value\\u263a"}'
+    assert repair_json('{"key": "value\\nvalue"}') == '{"key": "value\\nvalue"}'
+
+
+def test_valid_json_fast_path_does_not_initialize_repair_parser(monkeypatch):
+    def fail_parser_initialization(*_args, **_kwargs):
+        raise AssertionError("valid JSON fast path should not initialize the repair parser")
+
+    monkeypatch.setattr(json_repair_module, "JSONParser", fail_parser_initialization)
+
+    assert json_repair_module.repair_json('{"key": "value"}', return_objects=True) == {"key": "value"}
+
+
+def test_prefixed_valid_json_uses_value_fast_path_when_json_loads_is_skipped(monkeypatch):
+    raw = 'Here is your JSON:\n{"text": "a\\n b c, floof: a\\n ... a b (c), floof: \\n a", "id": 8}'
+    expected = {"text": "a\n b c, floof: a\n ... a b (c), floof: \n a", "id": 8}
+    original_try_parse = JSONParser._try_parse_valid_json_value
+    value_attempts: list[int] = []
+
+    def track_value_parse(self):
+        value_attempts.append(self.index)
+        return original_try_parse(self)
+
+    monkeypatch.setattr(JSONParser, "_try_parse_valid_json_value", track_value_parse)
+
+    assert repair_json(raw, return_objects=True) == expected
+    assert value_attempts
+
+    value_attempts.clear()
+
+    def fail_json_loads(*_args, **_kwargs):
+        raise AssertionError("skip_json_loads must not validate the whole input")
+
+    monkeypatch.setattr(json_repair_module.json, "loads", fail_json_loads)
+    assert repair_json(raw, return_objects=True, skip_json_loads=True) == expected
+    assert value_attempts
+
+
+def test_prefixed_valid_json_with_trailing_text_uses_value_fast_path(monkeypatch):
+    def fail_parse_object(*_args, **_kwargs):
+        raise AssertionError("raw decoding should avoid repair parsing")
+
+    monkeypatch.setattr(JSONParser, "parse_object", fail_parse_object)
+
+    raw = 'Here is your JSON:\n{"text": "literal } and ]"}\nAdditional explanation.'
+
+    assert repair_json(raw, return_objects=True) == {"text": "literal } and ]"}
+
+
+def test_prefixed_invalid_json_falls_back_to_repair_parser():
+    assert repair_json('Here is your JSON: {"key": "value', return_objects=True) == {"key": "value"}
+
+
+def test_multiple_jsons():
+    assert repair_json("[]{}") == "[]"
+    assert repair_json('[]{"key":"value"}') == '{"key": "value"}'
+    assert repair_json('{"key":"value"}[1,2,3,True]') == '[{"key": "value"}, [1, 2, 3, true]]'
+    assert repair_json('{"key":"value"}, {"key":"value_after"}', return_objects=True) == [
+        {"key": "value"},
+        {"key": "value_after"},
+    ]
+    assert (
+        repair_json('lorem ```json {"key":"value"} ``` ipsum ```json [1,2,3,True] ``` 42')
+        == '[{"key": "value"}, [1, 2, 3, true]]'
+    )
+    assert repair_json('[{"key":"value"}][{"key":"value_after"}]') == '[{"key": "value_after"}]'
+
+
+def test_top_level_separator_detects_pending_comma():
+    parser = JSONParser(' , {"key": "value"}', None, False)
+
+    assert parser._next_top_level_value_is_comma_separated()
+
+
+def test_parenthesized_prose_does_not_hijack_fenced_json():
+    assert (
+        repair_json(
+            """
+         **Decision**: bla, bla (some clarification):
+
+        ```json
+        {
+          "key": "value"
+        }
+        ```
+        """
+        )
+        == '{"key": "value"}'
+    )
+
+
+def test_numbered_prose_line_does_not_hijack_fenced_json():
+    assert (
+        repair_json(
+            """
+        (1) Keep this note in the explanation.
+
+        ```json
+        {
+          "key": "value"
+        }
+        ```
+        """
+        )
+        == '{"key": "value"}'
+    )
+
+
+def test_parenthesized_tuple_still_parses_when_it_is_the_fenced_json_payload():
+    assert repair_json(
+        """
+        Here is the tuple payload:
+
+        ```json
+        (1, 2)
+        ```
+        """,
+        return_objects=True,
+    ) == [1, 2]
+
+
+def test_repair_json_with_objects():
+    # Test with valid JSON strings
+    assert repair_json("[]", return_objects=True) == []
+    assert repair_json("{}", return_objects=True) == {}
+    assert repair_json('{"key": true, "key2": false, "key3": null}', return_objects=True) == {
+        "key": True,
+        "key2": False,
+        "key3": None,
+    }
+    assert repair_json('{"name": "John", "age": 30, "city": "New York"}', return_objects=True) == {
+        "name": "John",
+        "age": 30,
+        "city": "New York",
+    }
+    assert repair_json("[1, 2, 3, 4]", return_objects=True) == [1, 2, 3, 4]
+    assert repair_json('{"employees":["John", "Anna", "Peter"]} ', return_objects=True) == {
+        "employees": ["John", "Anna", "Peter"]
+    }
+    assert repair_json(
+        """
+{
+  "resourceType": "Bundle",
+  "id": "1",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "1",
+        "name": [
+          {"use": "official", "family": "Corwin", "given": ["Keisha", "Sunny"], "prefix": ["Mrs."},
+          {"use": "maiden", "family": "Goodwin", "given": ["Keisha", "Sunny"], "prefix": ["Mrs."]}
+        ]
+      }
+    }
+  ]
+}
+""",
+        return_objects=True,
+    ) == {
+        "resourceType": "Bundle",
+        "id": "1",
+        "type": "collection",
+        "entry": [
+            {
+                "resource": {
+                    "resourceType": "Patient",
+                    "id": "1",
+                    "name": [
+                        {
+                            "use": "official",
+                            "family": "Corwin",
+                            "given": ["Keisha", "Sunny"],
+                            "prefix": ["Mrs."],
+                        },
+                        {
+                            "use": "maiden",
+                            "family": "Goodwin",
+                            "given": ["Keisha", "Sunny"],
+                            "prefix": ["Mrs."],
+                        },
+                    ],
+                }
+            }
+        ],
+    }
+    assert repair_json(
+        '{\n"html": "<h3 id="aaa">Waarom meer dan 200 Technical Experts - "Passie voor techniek"?</h3>"}',
+        return_objects=True,
+    ) == {"html": '<h3 id="aaa">Waarom meer dan 200 Technical Experts - "Passie voor techniek"?</h3>'}
+    assert repair_json(
+        """
+        [
+            {
+                "foo": "Foo bar baz",
+                "tag": "#foo-bar-baz"
+            },
+            {
+                "foo": "foo bar "foobar" foo bar baz.",
+                "tag": "#foo-bar-foobar"
+            }
+        ]
+        """,
+        return_objects=True,
+    ) == [
+        {"foo": "Foo bar baz", "tag": "#foo-bar-baz"},
+        {"foo": 'foo bar "foobar" foo bar baz.', "tag": "#foo-bar-foobar"},
+    ]
+
+
+def test_repair_json_skip_json_loads():
+    assert (
+        repair_json('{"key": true, "key2": false, "key3": null}', skip_json_loads=True)
+        == '{"key": true, "key2": false, "key3": null}'
+    )
+    assert repair_json(
+        '{"key": true, "key2": false, "key3": null}',
+        return_objects=True,
+        skip_json_loads=True,
+    ) == {"key": True, "key2": False, "key3": None}
+    assert (
+        repair_json('{"key": true, "key2": false, "key3": }', skip_json_loads=True)
+        == '{"key": true, "key2": false, "key3": ""}'
+    )
+    assert loads('{"key": true, "key2": false, "key3": }', skip_json_loads=True) == {
+        "key": True,
+        "key2": False,
+        "key3": "",
+    }
+
+
+def _nested_repair_payload(depth: int) -> str:
+    return ("{a: [" * depth) + "1" + ("]}" * depth)
+
+
+def _find_real_recursion_payload() -> str:
+    depth = 1
+    recursion_limit = sys.getrecursionlimit()
+
+    while depth <= recursion_limit:
+        payload = _nested_repair_payload(depth)
+        try:
+            JSONParser(payload, None, False).parse()
+        except RecursionError:
+            return payload
+        depth *= 2
+
+    pytest.skip("Could not reproduce parser recursion on this runtime.")
+
+
+def test_repair_json_normalizes_real_parser_recursion_error():
+    payload = _find_real_recursion_payload()
+
+    with pytest.raises(ValueError, match="supported parser recursion depth"):
+        repair_json(payload, return_objects=True)
+
+
+def test_ensure_ascii():
+    assert repair_json("{'test_中国人_ascii':'统一码'}", ensure_ascii=False) == '{"test_中国人_ascii": "统一码"}'
+
+
+def test_stream_stable():
+    # default: stream_stable = False
+    # When the json to be repaired is the accumulation of streaming json at a certain moment.
+    # The default repair result is unstable.
+    assert repair_json('{"key": "val\\', stream_stable=False) == '{"key": "val\\\\"}'
+    assert repair_json('{"key": "val\\n', stream_stable=False) == '{"key": "val"}'
+    assert (
+        repair_json('{"key": "val\\n123,`key2:value2', stream_stable=False) == '{"key": "val\\n123", "key2": "value2"}'
+    )
+    assert repair_json('{"key": "val\\n123,`key2:value2`"}', stream_stable=True) == '{"key": "val\\n123,`key2:value2`"}'
+    # stream_stable = True
+    assert repair_json('{"key": "val\\', stream_stable=True) == '{"key": "val"}'
+    assert repair_json('{"key": "val\\n', stream_stable=True) == '{"key": "val\\n"}'
+    assert repair_json('{"key": "val\\n123,`key2:value2', stream_stable=True) == '{"key": "val\\n123,`key2:value2"}'
+    assert repair_json('{"key": "val\\n123,`key2:value2`"}', stream_stable=True) == '{"key": "val\\n123,`key2:value2`"}'
+
+
+def test_logging():
+    assert repair_json("{}", logging=True) == ({}, [])
+    assert repair_json('{"key": "value}', logging=True) == (
+        {"key": "value"},
+        [
+            {
+                "context": 'y": "value}',
+                "text": "While parsing a string missing the left delimiter in object value "
+                "context, we found a , or } and we couldn't determine that a right "
+                "delimiter was present. Stopping here",
+            },
+            {
+                "context": 'y": "value}',
+                "text": "While parsing a string, we missed the closing quote, ignoring",
+            },
+        ],
+    )

@@ -109,6 +109,9 @@ def repair_and_beautify(
         _vendor = os.path.join(os.path.dirname(os.path.dirname(__file__)), "vendor")
         if _vendor not in sys.path:
             sys.path.insert(0, _vendor)
+        from usr.plugins.context_doctor.helpers.json_repair_patch import apply_patch
+
+        apply_patch()
         from json_repair import repair_json
     except ImportError:
         return None

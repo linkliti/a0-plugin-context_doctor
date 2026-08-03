@@ -360,3 +360,52 @@ def test_tool_execute_before_skips_response_without_tool_name() -> None:
     asyncio.run(ext.execute(tool_args=tool_args))
 
     assert tool_args == original
+
+
+# ─── json_repair_patch regression tests ─────────────────────────────
+
+
+def test_patch_prevents_quoted_key_with_newline_split() -> None:
+    """Unescaped quotes inside a string value must not create a false member
+    boundary when the candidate key spans a newline."""
+    raw = '{"tool_name": "response", "tool_args": {"text": "a, "first\nsecond": val"}}'
+    result = repair_and_beautify(raw)
+    assert result is not None
+    obj = json.loads(result)
+    assert set(obj["tool_args"].keys()) == {"text"}
+    assert "first" in obj["tool_args"]["text"]
+    assert "second" in obj["tool_args"]["text"]
+
+
+def test_patch_prevents_long_quoted_key_split() -> None:
+    """Unescaped quotes creating a candidate key longer than 24 chars must
+    not be classified as a real object member."""
+    long_key = "w" * 25
+    raw = (
+        '{"tool_name": "response", "tool_args": {"text": "a, "' + long_key + '": val"}}'
+    )
+    result = repair_and_beautify(raw)
+    assert result is not None
+    obj = json.loads(result)
+    assert set(obj["tool_args"].keys()) == {"text"}
+    assert long_key in obj["tool_args"]["text"]
+
+
+def test_patch_prevents_timestamp_like_bare_key_split() -> None:
+    """A comma followed by digits with a colon (timestamp-like pattern) must
+    not be classified as a bare object member key."""
+    raw = '{"tool_name": "response", "tool_args": {"text": "a, 2026: 01 data"}}'
+    result = repair_and_beautify(raw)
+    assert result is not None
+    obj = json.loads(result)
+    assert set(obj["tool_args"].keys()) == {"text"}
+    assert "2026" in obj["tool_args"]["text"]
+
+
+def test_patch_preserves_valid_short_keys() -> None:
+    """Short, letter-only keys must still be recognized as real members."""
+    raw = '{"tool_name": "response", "tool_args": {"text": "ok", "note": "extra"}}'
+    result = repair_and_beautify(raw)
+    assert result is not None
+    obj = json.loads(result)
+    assert set(obj["tool_args"].keys()) == {"text", "note"}
