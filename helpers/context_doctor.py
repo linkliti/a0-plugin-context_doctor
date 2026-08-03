@@ -171,19 +171,21 @@ def update_log_item(
         except (ValueError, TypeError):
             parsed = {}
 
-        if isinstance(parsed, dict) and "tool_name" in parsed:
+        if isinstance(parsed, dict):
             new_kvps = {k: v for k, v in parsed.items()}
             new_heading = parsed.get("headline", "")
             if not new_heading and parsed.get("tool_name"):
                 new_heading = f"Using {parsed['tool_name']}"
-            new_heading = build_heading(agent, new_heading)
-            update_kwargs: dict[str, Any] = {"kvps": new_kvps, "heading": new_heading}
+            if new_heading:
+                new_heading = build_heading(agent, new_heading)
+            update_kwargs: dict[str, Any] = {"kvps": new_kvps}
+            if new_heading:
+                update_kwargs["heading"] = new_heading
             if update_log:
                 update_kwargs["content"] = transformed
+            elif raw_message:
+                update_kwargs["content"] = raw_message
             log_item.update(**update_kwargs)
-        else:
-            content_value = transformed if update_log else raw_message
-            log_item.update(kvps={}, content=content_value)
     except (AttributeError, TypeError):
         pass
 
