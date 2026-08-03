@@ -125,7 +125,10 @@ def repair_and_beautify(
         else:
             repair_kwargs["schema"] = _A0_SALVAGE_SCHEMA
             repair_kwargs["schema_repair_mode"] = "salvage"
-        repaired_obj = repair_json(raw, **repair_kwargs)
+        try:
+            repaired_obj = repair_json(raw, **repair_kwargs)
+        except Exception:
+            repaired_obj = repair_json(raw, return_objects=True)
     except Exception:
         return None
 

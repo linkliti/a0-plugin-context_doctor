@@ -15,6 +15,7 @@ from usr.plugins.context_doctor.helpers.context_doctor import (
     A0ToolCall,
     _validate_schema,
     repair_and_beautify,
+    transform_response,
 )
 
 
@@ -409,3 +410,26 @@ def test_patch_preserves_valid_short_keys() -> None:
     assert result is not None
     obj = json.loads(result)
     assert set(obj["tool_args"].keys()) == {"text", "note"}
+
+
+# ─── XML fallback and kvps regression tests ─────────────────────────
+
+
+def test_xml_wrapped_json_repaired_via_no_schema_fallback() -> None:
+    """JSON wrapped in XML tags must be recovered, not replaced with {}."""
+    raw = '<tool_args>\n{"tool_name": "response", "tool_args": {"text": "hi"}}\n</tool_args>'
+    result = repair_and_beautify(raw)
+    assert result is not None
+    obj = json.loads(result)
+    assert obj["tool_name"] == "response"
+    assert obj["tool_args"]["text"] == "hi"
+
+
+def test_plain_text_fallback_populates_kvps_from_thoughts() -> None:
+    """Plain text wrapped in {"thoughts": [raw]} must populate kvps with thoughts."""
+    raw = "just some plain text"
+    transformed = transform_response(raw)
+    assert transformed is not None
+    obj = json.loads(transformed)
+    assert "thoughts" in obj
+    assert obj["thoughts"] == ["just some plain text"]
