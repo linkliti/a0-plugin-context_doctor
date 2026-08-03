@@ -433,3 +433,19 @@ def test_plain_text_fallback_populates_kvps_from_thoughts() -> None:
     obj = json.loads(transformed)
     assert "thoughts" in obj
     assert obj["thoughts"] == ["just some plain text"]
+
+
+def test_doubled_json_extracts_valid_tool_call_from_list() -> None:
+    """When repair returns a list of dicts (prose with inline JSON before a
+    fenced code block), extract the last one that passes schema validation."""
+    raw = (
+        'See `{"thoughts": ["raw"]}` in the docs.\n'
+        "```\n"
+        '{"tool_name": "response", "tool_args": {"text": "hi"}}\n'
+        "```\n"
+    )
+    result = repair_and_beautify(raw)
+    assert result is not None
+    obj = json.loads(result)
+    assert obj["tool_name"] == "response"
+    assert obj["tool_args"]["text"] == "hi"

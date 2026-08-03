@@ -132,6 +132,16 @@ def repair_and_beautify(
     except Exception:
         return None
 
+    if isinstance(repaired_obj, list):
+        repaired_obj = next(
+            (
+                item
+                for item in reversed(repaired_obj)
+                if isinstance(item, dict) and _validate_schema(item)
+            ),
+            None,
+        )
+
     if not isinstance(repaired_obj, dict):
         return None
 
