@@ -24,11 +24,18 @@ Three hooks modify in-place, nothing appended:
 
 ## Settings
 
+### Experimental
+
 | Setting | Default | What it does |
 |---|---|---|
 | `minify` | `false` | Compact output, no whitespace |
-| `update_log` | `false` | Put repaired JSON in View Details. Kvps and heading always update. |
+
+### Debug
+
+| Setting | Default | What it does |
+|---|---|---|
 | `use_standard_mode` | `false` | Standard mode, no schema. Off = salvage mode with A0 schema. |
+| `update_log` | `false` | Put repaired JSON in View Details. Kvps and heading always update. |
 
 ## Structure
 
