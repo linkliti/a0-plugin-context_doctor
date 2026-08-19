@@ -580,3 +580,15 @@ def test_scoring_only_incomplete_fragments_picks_best() -> None:
     obj = json.loads(result)
     assert obj["tool_name"] == "y"
     assert obj["tool_args"]["code"] == "ls"
+
+
+def test_repair_unclosed_thoughts_array() -> None:
+    """Tool call with missing closing bracket for thoughts array."""
+    raw = (
+        '{"thoughts": ["thinking", "headline": "H", "tool_name": "x", "tool_args": {}}'
+    )
+    result = repair_and_beautify(raw)
+    assert result is not None
+    obj = json.loads(result)
+    assert obj["tool_name"] == "x"
+    assert obj["tool_args"] == {}
