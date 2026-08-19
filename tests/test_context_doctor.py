@@ -13,6 +13,7 @@ for p in (str(FRAMEWORK_ROOT), str(PLUGIN_ROOT)):
 
 from usr.plugins.context_doctor.helpers.context_doctor import (
     A0ToolCall,
+    _a0_completeness_score,
     _validate_schema,
     repair_and_beautify,
     transform_response,
@@ -496,3 +497,70 @@ def test_multiple_json_with_prose_picks_first_valid() -> None:
     assert result is not None
     obj = json.loads(result)
     assert obj["tool_args"]["text"] == "hello"
+
+
+# ─── completeness scoring ──────────────────────────────────────────
+
+
+def test_a0_completeness_score_full() -> None:
+    obj: dict = {
+        "thoughts": ["t"],
+        "headline": "H",
+        "tool_name": "response",
+        "tool_args": {"text": "hi"},
+    }
+    assert _a0_completeness_score(obj) == 5
+
+
+def test_a0_completeness_score_minimal() -> None:
+    obj = {"tool_name": "response", "tool_args": {"text": "hi"}}
+    assert _a0_completeness_score(obj) == 3
+
+
+def test_a0_completeness_score_empty_args() -> None:
+    obj = {"tool_name": "response", "tool_args": {}}
+    assert _a0_completeness_score(obj) == 2
+
+
+def test_scoring_picks_full_over_minimal() -> None:
+    """When a list has a full A0 tool call and an unrelated fragment with only
+    tool_name+tool_args, the full one wins via higher completeness score."""
+    raw = (
+        'Here is some data: {"tool_name": "data", "tool_args": {"val": 1}}\n'
+        'Now the real call: {"thoughts": ["go"], "headline": "Act", '
+        '"tool_name": "response", "tool_args": {"text": "hi"}}'
+    )
+    result = repair_and_beautify(raw)
+    assert result is not None
+    obj = json.loads(result)
+    assert obj["tool_name"] == "response"
+    assert obj["tool_args"]["text"] == "hi"
+    assert obj.get("headline") == "Act"
+
+
+def test_scoring_two_complete_calls_picks_first() -> None:
+    """Two equally complete A0 tool calls — first one wins (tie broken by
+    position via max stability)."""
+    raw = (
+        '{"thoughts": ["first"], "headline": "A", "tool_name": "response", '
+        '"tool_args": {"text": "one"}}'
+        '{"thoughts": ["second"], "headline": "B", "tool_name": "response", '
+        '"tool_args": {"text": "two"}}'
+    )
+    result = repair_and_beautify(raw)
+    assert result is not None
+    obj = json.loads(result)
+    assert obj["tool_args"]["text"] == "one"
+
+
+def test_scoring_only_incomplete_fragments_picks_best() -> None:
+    """When no full tool call exists, pick the most complete fragment."""
+    raw = (
+        'Fragment A: {"tool_name": "x", "tool_args": {}}\n'
+        'Fragment B: {"tool_name": "y", "tool_args": {"code": "ls"}}'
+    )
+    result = repair_and_beautify(raw)
+    assert result is not None
+    obj = json.loads(result)
+    assert obj["tool_name"] == "y"
+    assert obj["tool_args"]["code"] == "ls"

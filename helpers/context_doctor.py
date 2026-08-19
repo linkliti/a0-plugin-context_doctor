@@ -83,6 +83,21 @@ _A0_SALVAGE_SCHEMA: dict[str, Any] = {
 }
 
 
+def _a0_completeness_score(obj: dict[str, Any]) -> int:
+    """Score how complete an A0 tool-call dict is.
+
+    Higher score = more likely the real tool call. Ties broken by position
+    (first wins via ``max`` stability).
+    """
+    score = 0
+    for field in ("thoughts", "headline", "tool_name", "tool_args"):
+        if field in obj:
+            score += 1
+    if obj.get("tool_args"):
+        score += 1
+    return score
+
+
 def repair_and_beautify(
     raw: str,
     *,
@@ -131,25 +146,37 @@ def repair_and_beautify(
     except Exception:
         return None
 
-    # If salvage mode returned a non-validating result, retry without schema.
-    # Salvage can pick the wrong fragment (e.g. prose JSON before the real tool
-    # call). No-schema mode returns the full list of parsed objects, letting us
-    # pick the first valid tool call.
-    if not use_standard_mode and not _validate_schema(repaired_obj):
+    # Always try no-schema mode to discover all JSON fragments.
+    # Salvage mode may pick only the first fragment, missing the real tool call.
+    # No-schema mode returns the full list, letting scoring pick the best one.
+    if not use_standard_mode:
         try:
-            repaired_obj = repair_json(raw, return_objects=True)
+            noschema_obj = repair_json(raw, return_objects=True)
         except Exception:
-            pass
+            noschema_obj = None
+        # Prefer no-schema list over salvage single dict when it has more
+        # valid candidates with higher completeness.
+        if isinstance(noschema_obj, list):
+            noschema_valid = [
+                item
+                for item in noschema_obj
+                if isinstance(item, dict) and _validate_schema(item)
+            ]
+            if len(noschema_valid) > 1:
+                repaired_obj = noschema_obj
+            elif len(noschema_valid) == 1 and not _validate_schema(repaired_obj):
+                repaired_obj = noschema_obj
 
     if isinstance(repaired_obj, list):
-        repaired_obj = next(
-            (
-                item
-                for item in repaired_obj
-                if isinstance(item, dict) and _validate_schema(item)
-            ),
-            None,
-        )
+        valid = [
+            item
+            for item in repaired_obj
+            if isinstance(item, dict) and _validate_schema(item)
+        ]
+        if valid:
+            repaired_obj = max(valid, key=_a0_completeness_score)
+        else:
+            repaired_obj = None
 
     if not isinstance(repaired_obj, dict):
         return None
