@@ -64,6 +64,23 @@
                 </label>
               </div>
             </div>
+
+            <div class="field">
+              <div class="field-label">
+                <div class="field-title">Suppress XML output</div>
+                <div class="field-description">
+                  Replace corrupted tool calls containing XML tags with an empty
+                  JSON object. Disable to treat XML-containing text as raw
+                  thoughts instead.
+                </div>
+              </div>
+              <div class="field-control">
+                <label class="toggle">
+                  <input type="checkbox" x-model="config.suppress_xml" />
+                  <span class="toggler"></span>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
       </template>

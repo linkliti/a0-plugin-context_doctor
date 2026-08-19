@@ -499,6 +499,22 @@ def test_multiple_json_with_prose_picks_first_valid() -> None:
     assert obj["tool_args"]["text"] == "hello"
 
 
+def test_suppress_xml_default_returns_empty_obj() -> None:
+    """When suppress_xml is True (default), XML-containing text returns {}."""
+    raw = "<response>some xml content</response>"
+    result = transform_response(raw)
+    assert result == "{}"
+
+
+def test_suppress_xml_disabled_treats_as_raw_text() -> None:
+    """When suppress_xml is False, XML-containing text is wrapped as thoughts."""
+    raw = "<response>some xml content</response>"
+    result = transform_response(raw, suppress_xml=False)
+    obj = json.loads(result)
+    assert "thoughts" in obj
+    assert obj["thoughts"] == [raw]
+
+
 # ─── completeness scoring ──────────────────────────────────────────
 
 

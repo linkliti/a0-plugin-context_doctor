@@ -21,6 +21,7 @@ class ContextDoctorTool(Extension):
         config = get_plugin_config("context_doctor", agent=self.agent) or {}
         minify = config.get("minify", False)
         use_standard_mode = config.get("use_standard_mode", False)
+        suppress_xml = config.get("suppress_xml", True)
 
         tool_args = kwargs.get("tool_args")
         if not isinstance(tool_args, dict):
@@ -38,6 +39,7 @@ class ContextDoctorTool(Extension):
             raw_response,
             minify=minify,
             use_standard_mode=use_standard_mode,
+            suppress_xml=suppress_xml,
         )
 
         try:

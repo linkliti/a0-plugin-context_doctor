@@ -8,6 +8,7 @@ _DEFAULT_CONFIG = {
     "minify": False,
     "update_log": True,
     "use_standard_mode": False,
+    "suppress_xml": True,
 }
 
 

@@ -36,6 +36,7 @@ Three hooks modify in-place, nothing appended:
 |---|---|---|
 | `use_standard_mode` | `false` | Standard mode, no schema. Off = salvage mode with A0 schema. |
 | `update_log` | `false` | Put repaired JSON in View Details. Kvps and heading always update. |
+| `suppress_xml` | `true` | Replace XML-corrupted tool calls with `{}`. Disable to treat as raw text. |
 
 ## Structure
 

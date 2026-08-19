@@ -26,6 +26,7 @@ class ContextDoctorLog(Extension):
         minify = config.get("minify", False)
         update_log = config.get("update_log", False)
         use_standard_mode = config.get("use_standard_mode", False)
+        suppress_xml = config.get("suppress_xml", True)
 
         loop_data = kwargs.get("loop_data")
         if loop_data is None:
@@ -47,6 +48,7 @@ class ContextDoctorLog(Extension):
             content,
             minify=minify,
             use_standard_mode=use_standard_mode,
+            suppress_xml=suppress_xml,
         )
         if transformed == content:
             return

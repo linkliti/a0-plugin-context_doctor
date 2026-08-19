@@ -244,12 +244,14 @@ def transform_response(
     *,
     minify: bool = False,
     use_standard_mode: bool = False,
+    suppress_xml: bool = True,
 ) -> str:
     """Transform a raw model response into clean JSON.
 
     Three cases:
     1. Valid (possibly malformed) A0 tool-call JSON → repair + beautify.
-    2. Plain text with XML tags (corrupted tool call) → replace with ``{}``.
+    2. Plain text with XML tags (corrupted tool call) → replace with ``{}``
+       when *suppress_xml* is True, otherwise wrap as raw text.
     3. Plain text without XML → wrap the raw text in ``{"thoughts": [raw]}``.
 
     Always returns a JSON string. Never returns ``None``.
@@ -270,6 +272,6 @@ def transform_response(
 
     # Not a valid tool call — determine replacement based on XML presence
     has_xml = "<" in raw and ">" in raw
-    if has_xml:
+    if has_xml and suppress_xml:
         return _XML_CORRUPTION_REPLACEMENT
     return json.dumps({"thoughts": [raw]}, indent=_indent, ensure_ascii=False)

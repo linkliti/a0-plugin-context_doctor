@@ -1,3 +1,4 @@
 minify: false
 update_log: false
 use_standard_mode: false
+suppress_xml: true

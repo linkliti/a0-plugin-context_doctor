@@ -27,6 +27,7 @@ class ContextDoctorHistory(Extension):
         minify = config.get("minify", False)
         update_log = config.get("update_log", False)
         use_standard_mode = config.get("use_standard_mode", False)
+        suppress_xml = config.get("suppress_xml", True)
 
         args = data.get("args")
         if not isinstance(args, tuple) or len(args) < 2:
@@ -39,6 +40,7 @@ class ContextDoctorHistory(Extension):
             raw_message,
             minify=minify,
             use_standard_mode=use_standard_mode,
+            suppress_xml=suppress_xml,
         )
         if transformed == raw_message:
             return
