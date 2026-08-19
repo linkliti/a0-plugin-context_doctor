@@ -437,7 +437,7 @@ def test_plain_text_fallback_populates_kvps_from_thoughts() -> None:
 
 def test_doubled_json_extracts_valid_tool_call_from_list() -> None:
     """When repair returns a list of dicts (prose with inline JSON before a
-    fenced code block), extract the last one that passes schema validation."""
+    fenced code block), extract the first one that passes schema validation."""
     raw = (
         'See `{"thoughts": ["raw"]}` in the docs.\n'
         "```\n"
@@ -449,3 +449,50 @@ def test_doubled_json_extracts_valid_tool_call_from_list() -> None:
     obj = json.loads(result)
     assert obj["tool_name"] == "response"
     assert obj["tool_args"]["text"] == "hi"
+
+
+def test_concatenated_jsons_picks_first_valid() -> None:
+    """Two valid tool-call JSONs concatenated with no separator — pick the
+    first, not the second (which may be a hallucinated continuation)."""
+    raw = (
+        '{"thoughts": ["first"], "headline": "First", "tool_name": "call_subordinate", '
+        '"tool_args": {"message": "go"}}'
+        '{"thoughts": ["second"], "headline": "Second", "tool_name": "response", '
+        '"tool_args": {"text": "hi"}}'
+    )
+    result = repair_and_beautify(raw)
+    assert result is not None
+    obj = json.loads(result)
+    assert obj["tool_name"] == "call_subordinate"
+    assert obj["tool_args"]["message"] == "go"
+
+
+def test_nested_json_inside_thoughts_not_extracted() -> None:
+    """JSON embedded inside a thoughts string must not be extracted as the
+    tool call — the outer object is the real tool call."""
+    raw = (
+        '{"thoughts": ["Consider this: {\\"tool_name\\": \\"response\\", \\"tool_args\\": {\\"text\\": \\"fake\\"}}"], '
+        '"headline": "Real", "tool_name": "code_execution_tool", '
+        '"tool_args": {"runtime": "terminal", "code": "echo hi"}}'
+    )
+    result = repair_and_beautify(raw)
+    assert result is not None
+    obj = json.loads(result)
+    assert obj["tool_name"] == "code_execution_tool"
+    assert obj["tool_args"]["code"] == "echo hi"
+
+
+def test_multiple_json_with_prose_picks_first_valid() -> None:
+    """Multiple JSON objects separated by prose — first valid tool call wins.
+    The no-schema fallback returns a list when salvage mode picks the wrong
+    fragment, and forward iteration selects the first schema-valid dict."""
+    raw = (
+        "Here is the first call:\n"
+        '{"tool_name": "response", "tool_args": {"text": "hello"}}\n'
+        "And here is a second one:\n"
+        '{"tool_name": "response", "tool_args": {"text": "world"}}\n'
+    )
+    result = repair_and_beautify(raw)
+    assert result is not None
+    obj = json.loads(result)
+    assert obj["tool_args"]["text"] == "hello"

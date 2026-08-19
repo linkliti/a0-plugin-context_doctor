@@ -132,11 +132,21 @@ def repair_and_beautify(
     except Exception:
         return None
 
+    # If salvage mode returned a non-validating result, retry without schema.
+    # Salvage can pick the wrong fragment (e.g. prose JSON before the real tool
+    # call). No-schema mode returns the full list of parsed objects, letting us
+    # pick the first valid tool call.
+    if not use_standard_mode and not _validate_schema(repaired_obj):
+        try:
+            repaired_obj = repair_json(raw, return_objects=True)
+        except Exception:
+            pass
+
     if isinstance(repaired_obj, list):
         repaired_obj = next(
             (
                 item
-                for item in reversed(repaired_obj)
+                for item in repaired_obj
                 if isinstance(item, dict) and _validate_schema(item)
             ),
             None,

@@ -44,7 +44,7 @@ context_doctor/
 │   ├── _functions/agent/Agent/hist_add_ai_response/end/_20_context_doctor.py
 │   └── tool_execute_before/_30_context_doctor.py
 ├── webui/config.html
-└── tests/                             # unit + integration + e2e (58 tests)
+└── tests/                             # unit + integration + e2e (366 tests)
 ```
 
 ## Install
