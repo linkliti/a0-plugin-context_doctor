@@ -5,7 +5,6 @@ from unittest.mock import patch
 import pytest
 
 _DEFAULT_CONFIG = {
-    "indent": 4,
     "minify": False,
     "update_log": True,
     "use_standard_mode": False,

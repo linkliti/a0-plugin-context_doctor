@@ -20,7 +20,6 @@ class ContextDoctorTool(Extension):
 
         config = get_plugin_config("context_doctor", agent=self.agent) or {}
         minify = config.get("minify", False)
-        indent = config.get("indent", 4)
         use_standard_mode = config.get("use_standard_mode", False)
 
         tool_args = kwargs.get("tool_args")
@@ -37,7 +36,6 @@ class ContextDoctorTool(Extension):
 
         transformed = transform_response(
             raw_response,
-            indent=indent,
             minify=minify,
             use_standard_mode=use_standard_mode,
         )

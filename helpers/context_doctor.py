@@ -86,11 +86,10 @@ _A0_SALVAGE_SCHEMA: dict[str, Any] = {
 def repair_and_beautify(
     raw: str,
     *,
-    indent: int = 4,
     minify: bool = False,
     use_standard_mode: bool = False,
 ) -> str | None:
-    """Repair malformed JSON and beautify with indentation.
+    """Repair malformed JSON and beautify with 4-space indentation.
 
     The entire raw text is passed to ``json_repair.repair_json`` which handles
     finding and repairing JSON in arbitrary text — no pre-extraction needed.
@@ -161,7 +160,7 @@ def repair_and_beautify(
     try:
         return json.dumps(
             repaired_obj,
-            indent=None if minify else indent,
+            indent=None if minify else 4,
             ensure_ascii=False,
             separators=(",", ":") if minify else None,
         )
@@ -216,7 +215,6 @@ def update_log_item(
 def transform_response(
     raw: str,
     *,
-    indent: int = 4,
     minify: bool = False,
     use_standard_mode: bool = False,
 ) -> str:
@@ -229,7 +227,7 @@ def transform_response(
 
     Always returns a JSON string. Never returns ``None``.
     """
-    _indent = None if minify else indent
+    _indent = None if minify else 4
 
     if not raw:
         return json.dumps({"thoughts": [""]}, indent=_indent, ensure_ascii=False)
@@ -237,7 +235,6 @@ def transform_response(
     # Try to repair as A0 tool-call JSON first
     beautified = repair_and_beautify(
         raw,
-        indent=indent,
         minify=minify,
         use_standard_mode=use_standard_mode,
     )

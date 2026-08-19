@@ -26,7 +26,6 @@ Three hooks modify in-place, nothing appended:
 
 | Setting | Default | What it does |
 |---|---|---|
-| `indent` | `4` | JSON indent spaces |
 | `minify` | `false` | Compact output, no whitespace |
 | `update_log` | `false` | Put repaired JSON in View Details. Kvps and heading always update. |
 | `use_standard_mode` | `false` | Standard mode, no schema. Off = salvage mode with A0 schema. |

@@ -25,7 +25,6 @@ class ContextDoctorLog(Extension):
         config = get_plugin_config("context_doctor", agent=self.agent) or {}
         minify = config.get("minify", False)
         update_log = config.get("update_log", False)
-        indent = config.get("indent", 4)
         use_standard_mode = config.get("use_standard_mode", False)
 
         loop_data = kwargs.get("loop_data")
@@ -46,7 +45,6 @@ class ContextDoctorLog(Extension):
 
         transformed = transform_response(
             content,
-            indent=indent,
             minify=minify,
             use_standard_mode=use_standard_mode,
         )
