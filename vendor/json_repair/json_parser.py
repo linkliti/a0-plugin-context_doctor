@@ -8,10 +8,7 @@ from .parse_comment import parse_comment as _parse_comment
 from .parse_number import parse_number as _parse_number
 from .parse_object import parse_object as _parse_object
 from .parse_string import parse_string as _parse_string
-from .parser_parenthesized import (
-    parenthesized_is_explicit_tuple,
-    top_level_parenthesized_can_start_value,
-)
+from .parser_parenthesized import parenthesized_is_explicit_tuple, top_level_parenthesized_can_start_value
 from .utils.constants import STRING_DELIMITERS, JSONReturnType
 from .utils.json_context import ContextValues, JsonContext
 from .utils.object_comparer import ObjectComparer
@@ -31,8 +28,8 @@ class JSONParser:
     ) -> list[JSONReturnType]:
         return _parse_array(self, schema, path, closing_delimiter)
 
-    def parse_comment(self) -> JSONReturnType:
-        return _parse_comment(self)
+    def parse_comment(self, record_top_level_value: bool = False) -> JSONReturnType:
+        return _parse_comment(self, record_top_level_value=record_top_level_value)
 
     def parse_number(self) -> JSONReturnType:
         return _parse_number(self)
@@ -94,6 +91,7 @@ class JSONParser:
         self.strict = strict
         self.try_valid_json_suffix = try_valid_json_suffix
         self.has_tried_valid_json_suffix = False
+        self._last_parse_found_value = False
         self.schema_repairer: SchemaRepairer | None = None
 
     def parse(
@@ -108,13 +106,41 @@ class JSONParser:
     ) -> JSONReturnType:
         """Parse with schema guidance enabled for all nested values."""
         self.schema_repairer = repairer
+        if repairer.schema_repair_mode == "salvage":
+            return self._parse_top_level_salvage_with_schema(repairer, schema)
         return self._parse_top_level(lambda: self.parse_json(schema, "$"))
+
+    def _parse_top_level_salvage_with_schema(
+        self,
+        repairer: "SchemaRepairer",
+        schema: dict[str, Any] | bool,
+    ) -> JSONReturnType:
+        """Return the first schema-valid top-level fragment while salvaging."""
+        last_error: ValueError | None = None
+        while self.index < len(self.json_str):
+            self.context.clear()
+            self.deferred_contexts.clear()
+            value = self.parse_json(schema, "$", finalize_schema=False, record_top_level_value=True)
+            if not self._last_parse_found_value:
+                break
+            try:
+                repaired = repairer.repair_value(value, schema, "$")
+                repairer.validate(repaired, schema)
+            except ValueError as exc:
+                last_error = exc
+                if self.index >= len(self.json_str):
+                    break
+                self.log("Skipped top-level fragment that did not match schema while salvaging")
+                continue
+            else:
+                return repaired
+        if last_error is not None:
+            raise last_error
+        return ""
 
     # Consolidate top-level parsing so we handle multiple sequential JSON values consistently
     # (including update semantics and strict-mode validation).
-    def _parse_top_level(
-        self, parse_element: Callable[[], JSONReturnType]
-    ) -> JSONReturnType:
+    def _parse_top_level(self, parse_element: Callable[[], JSONReturnType]) -> JSONReturnType:
         json = parse_element()
         if self.index < len(self.json_str):
             self.log(
@@ -131,13 +157,9 @@ class JSONParser:
                     self.log(
                         "Multiple top-level JSON elements found in strict mode, raising an error",
                     )
-                    raise ValueError(
-                        "Multiple top-level JSON elements found in strict mode."
-                    )
+                    raise ValueError("Multiple top-level JSON elements found in strict mode.")
                 if j:
-                    if not is_comma_separated and ObjectComparer.is_same_object(
-                        json[-1], j
-                    ):
+                    if not is_comma_separated and ObjectComparer.is_same_object(json[-1], j):
                         # Treat repeated objects as updates: keep the newest value.
                         json.pop()
                     else:
@@ -186,14 +208,18 @@ class JSONParser:
         self,
         schema: dict[str, Any] | bool | None = None,
         path: str = "$",
+        finalize_schema: bool = True,
+        record_top_level_value: bool = False,
     ) -> JSONReturnType:
         """Parse the next JSON value and, when configured, enforce schema constraints."""
+        if record_top_level_value:
+            self._last_parse_found_value = False
         if self.deferred_contexts:
             deferred_contexts, self.deferred_contexts = self.deferred_contexts, []
             with ExitStack() as stack:
                 for context_value in deferred_contexts:
                     stack.enter_context(self.context.enter(context_value))
-                return self.parse_json(schema, path)
+                return self.parse_json(schema, path, finalize_schema, record_top_level_value)
 
         repairer, schema = self._resolve_schema_for_parse(schema)
 
@@ -205,50 +231,49 @@ class JSONParser:
             if self.try_valid_json_suffix and char in ["{", "["]:
                 parsed_suffix, value = self._try_parse_valid_json_value()
                 if parsed_suffix:
-                    return self._finalize_parsed_value(value, repairer, schema, path)
+                    return self._finalize_parsed_value(
+                        value, repairer, schema, path, finalize_schema, record_top_level_value
+                    )
             # <object> starts with '{'
             if char == "{":
                 self.index += 1
-                value = (
-                    self.parse_object(schema, path) if repairer else self.parse_object()
+                value = self.parse_object(schema, path) if repairer else self.parse_object()
+                return self._finalize_parsed_value(
+                    value, repairer, schema, path, finalize_schema, record_top_level_value
                 )
-                return self._finalize_parsed_value(value, repairer, schema, path)
             # <array> starts with '['
             if char == "[":
                 self.index += 1
-                value = (
-                    self.parse_array(schema, path) if repairer else self.parse_array()
+                value = self.parse_array(schema, path) if repairer else self.parse_array()
+                return self._finalize_parsed_value(
+                    value, repairer, schema, path, finalize_schema, record_top_level_value
                 )
-                return self._finalize_parsed_value(value, repairer, schema, path)
             # Python tuple literals and grouped values start with '('
             if char == "(":
                 # Keep top-level tuple detection conservative so inline prose like
                 # "note (clarification):" does not hijack later JSON blocks.
-                if (
-                    not self.context.empty
-                    or self.top_level_parenthesized_can_start_value()
-                ):
-                    value = (
-                        self.parse_parenthesized(schema, path)
-                        if repairer
-                        else self.parse_parenthesized()
+                if not self.context.empty or self.top_level_parenthesized_can_start_value():
+                    value = self.parse_parenthesized(schema, path) if repairer else self.parse_parenthesized()
+                    return self._finalize_parsed_value(
+                        value, repairer, schema, path, finalize_schema, record_top_level_value
                     )
-                    return self._finalize_parsed_value(value, repairer, schema, path)
                 self.index += 1
                 continue
             # <string> starts with a quote
             if not self.context.empty and (char in STRING_DELIMITERS or char.isalpha()):
                 value = self.parse_string()
-                return self._finalize_parsed_value(value, repairer, schema, path)
+                return self._finalize_parsed_value(
+                    value, repairer, schema, path, finalize_schema, record_top_level_value
+                )
             # <number> starts with [0-9] or minus
-            if not self.context.empty and (
-                char.isdigit() or char == "-" or char == "."
-            ):
+            if not self.context.empty and (char.isdigit() or char == "-" or char == "."):
                 value = self.parse_number()
-                return self._finalize_parsed_value(value, repairer, schema, path)
+                return self._finalize_parsed_value(
+                    value, repairer, schema, path, finalize_schema, record_top_level_value
+                )
             if char in ["#", "/"]:
-                value = self.parse_comment()
-                return self._finalize_parsed_value(value, repairer, schema, path)
+                value = self.parse_comment(record_top_level_value)
+                return self._finalize_parsed_value(value, repairer, schema, path, finalize_schema)
             # If everything else fails, we just ignore and move on
             self.index += 1
 
@@ -256,11 +281,7 @@ class JSONParser:
         self,
         schema: dict[str, Any] | bool | None,
     ) -> tuple["SchemaRepairer | None", dict[str, Any] | bool | None]:
-        repairer = (
-            self.schema_repairer
-            if self.schema_repairer is not None and schema not in (None, True)
-            else None
-        )
+        repairer = self.schema_repairer if self.schema_repairer is not None and schema not in (None, True) else None
         if repairer is None:
             return None, schema
 
@@ -271,14 +292,18 @@ class JSONParser:
             raise ValueError("Schema does not allow any values.")
         return repairer, schema
 
-    @staticmethod
     def _finalize_parsed_value(
+        self,
         value: JSONReturnType,
         repairer: "SchemaRepairer | None",
         schema: dict[str, Any] | bool | None,
         path: str,
+        finalize_schema: bool = True,
+        record_top_level_value: bool = False,
     ) -> JSONReturnType:
-        if repairer is None:
+        if record_top_level_value:
+            self._last_parse_found_value = True
+        if repairer is None or not finalize_schema:
             return value
         return repairer.repair_value(value, schema, path)
 

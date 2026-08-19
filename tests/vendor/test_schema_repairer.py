@@ -20,7 +20,10 @@ def test_missing_value_deepcopy():
 
 def test_normalize_missing_values_nested_and_invalid():
     assert normalize_missing_values(MISSING_VALUE) == ""
-    assert normalize_missing_values({"a": MISSING_VALUE, "b": [MISSING_VALUE, 1]}) == {"a": "", "b": ["", 1]}
+    assert normalize_missing_values({"a": MISSING_VALUE, "b": [MISSING_VALUE, 1]}) == {
+        "a": "",
+        "b": ["", 1],
+    }
     with pytest.raises(ValueError, match="Object keys must be strings"):
         normalize_missing_values({1: "a"})
     with pytest.raises(ValueError, match="JSON compatible"):
@@ -93,7 +96,9 @@ def test_schema_from_input_model_defaults_and_required():
         def model_json_schema():
             return {"properties": {"name": {"default": "keep"}}}
 
-        model_fields: ClassVar[dict[str, DummyField]] = {"name": DummyField(default="x")}
+        model_fields: ClassVar[dict[str, DummyField]] = {
+            "name": DummyField(default="x")
+        }
 
     schema_with_default = schema_from_input(DummyModelWithDefaults)
     assert isinstance(schema_with_default, dict)
@@ -149,7 +154,9 @@ def test_schema_repairer_validate_and_prepare():
         repairer.validate(1, False)
     integer_schema = {"type": "integer"}
     repairer.validate(1, integer_schema)
-    assert repairer._get_validator(integer_schema) is repairer._get_validator(integer_schema)
+    assert repairer._get_validator(integer_schema) is repairer._get_validator(
+        integer_schema
+    )
     repairer.is_valid(1, integer_schema)
     repairer.is_valid(2, integer_schema)
     assert len(repairer._validator_cache) == 1
@@ -179,7 +186,12 @@ def test_schema_repairer_validate_and_prepare():
 
 
 def test_schema_repairer_resolve_schema_and_refs():
-    root = {"defs": {"node": {"type": "string"}}, "flag": True, "flag_false": False, "bad": 1}
+    root = {
+        "defs": {"node": {"type": "string"}},
+        "flag": True,
+        "flag_false": False,
+        "bad": 1,
+    }
     repairer = SchemaRepairer(root, None)
     assert repairer.resolve_schema(None) is True
     assert repairer.resolve_schema(False) is False
@@ -256,7 +268,10 @@ def test_repair_value_missing_and_unions():
 
     schema_array_union = {"type": ["array", "string"], "items": {"type": "integer"}}
     assert repairer.repair_value(["1"], schema_array_union, "$") == [1]
-    schema_obj_union = {"type": ["object", "string"], "properties": {"a": {"type": "integer"}}}
+    schema_obj_union = {
+        "type": ["object", "string"],
+        "properties": {"a": {"type": "integer"}},
+    }
     assert repairer.repair_value({"a": "1"}, schema_obj_union, "$") == {"a": 1}
 
 
@@ -288,10 +303,15 @@ def test_salvage_skips_object_mapping_for_mixed_object_array_schema():
 
 def test_can_salvage_list_as_object_requires_object_without_array():
     repairer = SchemaRepairer({}, [], schema_repair_mode="salvage")
-    assert repairer._can_salvage_list_as_object({"properties": {"a": {"type": "integer"}}}) is True
+    assert (
+        repairer._can_salvage_list_as_object({"properties": {"a": {"type": "integer"}}})
+        is True
+    )
     assert repairer._can_salvage_list_as_object({"items": {"type": "integer"}}) is False
     assert (
-        repairer._can_salvage_list_as_object({"properties": {"a": {"type": "integer"}}, "items": {"type": "integer"}})
+        repairer._can_salvage_list_as_object(
+            {"properties": {"a": {"type": "integer"}}, "items": {"type": "integer"}}
+        )
         is False
     )
 
@@ -378,9 +398,13 @@ def test_repair_object_and_array_paths():
     salvage_repairer = SchemaRepairer({}, [], schema_repair_mode="salvage")
     assert salvage_repairer._map_list_to_object([1], {"type": "object"}, "$") is None
     assert salvage_repairer.repair_value(["bad"], schema_tuple_invalid, "$") == []
-    assert salvage_repairer.repair_value([1, "bad"], schema_additional_invalid, "$") == [1]
+    assert salvage_repairer.repair_value(
+        [1, "bad"], schema_additional_invalid, "$"
+    ) == [1]
     with pytest.raises(ValueError, match="Unsupported schema type bogus"):
-        salvage_repairer.repair_value([1], {"type": "array", "items": [{"type": "bogus"}]}, "$")
+        salvage_repairer.repair_value(
+            [1], {"type": "array", "items": [{"type": "bogus"}]}, "$"
+        )
     with pytest.raises(ValueError, match="Unsupported schema type bogus"):
         salvage_repairer.repair_value(
             [1, 2],
@@ -392,9 +416,13 @@ def test_repair_object_and_array_paths():
             "$",
         )
     with pytest.raises(ValueError, match="Unsupported schema type bogus"):
-        salvage_repairer._map_list_to_object([1], {"type": "object", "properties": {"a": {"type": "bogus"}}}, "$")
+        salvage_repairer._map_list_to_object(
+            [1], {"type": "object", "properties": {"a": {"type": "bogus"}}}, "$"
+        )
     with pytest.raises(ValueError, match="property names must be strings"):
-        salvage_repairer._map_list_to_object([1], {"type": "object", "properties": {1: {"type": "integer"}}}, "$")
+        salvage_repairer._map_list_to_object(
+            [1], {"type": "object", "properties": {1: {"type": "integer"}}}, "$"
+        )
 
 
 def test_fill_missing_and_coerce_scalar_paths():
@@ -467,7 +495,9 @@ def test_fill_missing_and_coerce_scalar_paths():
 
     assert repairer.repair_value({"a": MISSING_VALUE}, {}, "$") == {"a": ""}
     assert repairer.repair_value({"a": MISSING_VALUE}, {"allOf": []}, "$") == {"a": ""}
-    assert repairer.repair_value({"a": "1"}, {"properties": {"a": {"type": "integer"}}}, "$") == {"a": 1}
+    assert repairer.repair_value(
+        {"a": "1"}, {"properties": {"a": {"type": "integer"}}}, "$"
+    ) == {"a": 1}
     assert repairer.repair_value(["1"], {"items": {"type": "integer"}}, "$") == [1]
     with pytest.raises(ValueError, match="Schema does not allow"):
         repairer.repair_value(1, False, "$")
@@ -485,7 +515,10 @@ def test_repair_object_skips_unsupported_pattern_regex_with_fallback_and_log():
     repaired = repairer.repair_value({"x1": 2}, schema, "$")
 
     assert repaired == {"x1": "2"}
-    assert any("Skipped unsupported patternProperties regex '^x[0-9]+$'" in entry["text"] for entry in log)
+    assert any(
+        "Skipped unsupported patternProperties regex '^x[0-9]+$'" in entry["text"]
+        for entry in log
+    )
 
 
 def test_apply_enum_const_mismatch_raises():

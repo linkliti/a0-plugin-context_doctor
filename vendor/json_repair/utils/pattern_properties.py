@@ -1,9 +1,7 @@
 from collections.abc import Mapping
 from typing import Any
 
-_UNSUPPORTED_REGEX_TOKENS = frozenset(
-    {".", "^", "$", "*", "+", "?", "{", "}", "[", "]", "|", "(", ")", "\\"}
-)
+_UNSUPPORTED_REGEX_TOKENS = frozenset({".", "^", "$", "*", "+", "?", "{", "}", "[", "]", "|", "(", ")", "\\"})
 
 
 def match_pattern_properties(

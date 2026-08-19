@@ -6,7 +6,9 @@ from src.json_repair import repair_json
 
 
 def repair_with_schema(raw, schema, **kwargs):
-    return repair_json(raw, schema=schema, skip_json_loads=True, return_objects=True, **kwargs)
+    return repair_json(
+        raw, schema=schema, skip_json_loads=True, return_objects=True, **kwargs
+    )
 
 
 def _two_string_schema() -> dict:
@@ -26,7 +28,10 @@ def _two_string_schema() -> dict:
 def _assert_two_string_schema_repairs(raw: str, expected: dict) -> None:
     schema = _two_string_schema()
     assert repair_json(raw, schema=schema, return_objects=True) == expected
-    assert repair_json(raw, schema=schema, skip_json_loads=True, return_objects=True) == expected
+    assert (
+        repair_json(raw, schema=schema, skip_json_loads=True, return_objects=True)
+        == expected
+    )
 
 
 def test_schema_guides_missing_value_type_defaults():
@@ -67,6 +72,116 @@ def test_schema_missing_required_property_raises():
         repair_with_schema("{}", schema)
 
 
+def test_schema_salvage_selects_first_matching_top_level_fragment():
+    pytest.importorskip("jsonschema")
+    schema = {
+        "type": "object",
+        "properties": {"name": {"type": "string"}, "age": {"type": "integer"}},
+        "required": ["name", "age"],
+    }
+    raw = """Here is an example: {"foo": 1}
+
+Final answer:
+```json
+{"name": "Alice", "age": 30}
+```
+
+Alternative: {"name": "Bob", "age": 40}"""
+
+    assert repair_with_schema(raw, schema, schema_repair_mode="salvage") == {
+        "name": "Alice",
+        "age": 30,
+    }
+    repaired, logs = cast(
+        "tuple[object, list[dict[str, str]]]",
+        repair_json(
+            raw,
+            schema=schema,
+            skip_json_loads=True,
+            logging=True,
+            schema_repair_mode="salvage",
+        ),
+    )
+    assert repaired == {"name": "Alice", "age": 30}
+    assert any(
+        log["text"]
+        == "Skipped top-level fragment that did not match schema while salvaging"
+        for log in logs
+    )
+
+
+def test_schema_salvage_skips_list_fragment_before_matching_object():
+    pytest.importorskip("jsonschema")
+    schema = {
+        "type": "object",
+        "properties": {"name": {"type": "string"}, "age": {"type": "integer"}},
+        "required": ["name", "age"],
+    }
+    raw = """The options are ["a", "b"].
+
+{"name": "Alice", "age": 30}"""
+
+    assert repair_with_schema(raw, schema, schema_repair_mode="salvage") == {
+        "name": "Alice",
+        "age": 30,
+    }
+
+
+def test_schema_standard_still_rejects_invalid_first_top_level_fragment():
+    pytest.importorskip("jsonschema")
+    schema = {
+        "type": "object",
+        "properties": {"name": {"type": "string"}, "age": {"type": "integer"}},
+        "required": ["name", "age"],
+    }
+
+    with pytest.raises(ValueError, match="Missing required properties"):
+        repair_with_schema('{"foo": 1}\n{"name": "Alice", "age": 30}', schema)
+
+
+def test_schema_salvage_raises_when_no_top_level_fragment_matches():
+    pytest.importorskip("jsonschema")
+    schema = {
+        "type": "object",
+        "properties": {"name": {"type": "string"}, "age": {"type": "integer"}},
+        "required": ["name", "age"],
+    }
+
+    with pytest.raises(ValueError, match="Missing required properties"):
+        repair_with_schema(
+            '{"foo": 1}\n{"bar": 2}', schema, schema_repair_mode="salvage"
+        )
+
+    with pytest.raises(ValueError, match="Missing required properties"):
+        repair_with_schema(
+            '{"foo": 1} trailing prose', schema, schema_repair_mode="salvage"
+        )
+
+    with pytest.raises(ValueError, match="Missing required properties"):
+        repair_with_schema(
+            '{"foo": 1} // trailing comment', schema, schema_repair_mode="salvage"
+        )
+
+    with pytest.raises(ValueError, match="is not of type 'object'"):
+        repair_with_schema("", schema, schema_repair_mode="salvage")
+
+
+def test_schema_salvage_does_not_select_an_item_from_a_real_top_level_array():
+    pytest.importorskip("jsonschema")
+    schema = {
+        "type": "object",
+        "properties": {"name": {"type": "string"}, "age": {"type": "integer"}},
+        "required": ["name", "age"],
+    }
+
+    with pytest.raises(ValueError, match="Expected object"):
+        repair_with_schema(
+            '[{"foo": 1}, {"name": "Alice", "age": 30}]',
+            schema,
+            schema_repair_mode="salvage",
+        )
+
+
 def test_schema_optional_default_is_inserted():
     pytest.importorskip("jsonschema")
     schema = {
@@ -89,14 +204,18 @@ def test_schema_applies_to_valid_json_without_skip_json_loads():
         "required": ["value"],
     }
     # Fast-path validation fails, then parser+schema fallback repairs.
-    assert repair_json('{"value": "1"}', schema=schema, return_objects=True) == {"value": 1}
+    assert repair_json('{"value": "1"}', schema=schema, return_objects=True) == {
+        "value": 1
+    }
     # Fast-path validation fails for a scalar, but schema-aware repair can fix it directly.
     assert repair_json('"1"', schema={"type": "integer"}, return_objects=True) == 1
     # Fast-path validation fails for a valid scalar and parser fallback returns empty string.
     assert repair_json("true", schema={"type": "string"}, return_objects=True) == ""
 
     with pytest.raises(ValueError, match="does not match"):
-        repair_json('"bbb"', schema={"type": "string", "pattern": "^a+$"}, return_objects=True)
+        repair_json(
+            '"bbb"', schema={"type": "string", "pattern": "^a+$"}, return_objects=True
+        )
 
 
 def test_schema_union_branch_keeps_root_defs_scope_during_repair():
@@ -121,11 +240,13 @@ def test_schema_union_branch_keeps_root_defs_scope_during_repair():
         "required": ["value"],
     }
 
-    assert repair_json('{"value": [{"name": "example"}],}', schema=schema, return_objects=True) == {
-        "value": [{"name": "example"}]
-    }
+    assert repair_json(
+        '{"value": [{"name": "example"}],}', schema=schema, return_objects=True
+    ) == {"value": [{"name": "example"}]}
     with pytest.raises(ValueError, match="Expected null"):
-        repair_json('{"value": [{"name": "invalid"}],}', schema=schema, return_objects=True)
+        repair_json(
+            '{"value": [{"name": "invalid"}],}', schema=schema, return_objects=True
+        )
 
 
 def test_schema_valid_fast_path_keeps_logging_empty():
@@ -156,15 +277,31 @@ def test_schema_unwraps_double_serialized_object_in_all_modes():
         },
         "required": ["summary"],
     }
-    raw = '{"summary": "{\\"verdict\\": \\"malicious\\", \\"confidence\\": \\"high\\"}"}'
+    raw = (
+        '{"summary": "{\\"verdict\\": \\"malicious\\", \\"confidence\\": \\"high\\"}"}'
+    )
     expected = {"summary": {"verdict": "malicious", "confidence": "high"}}
 
-    assert repair_json(raw, schema=schema, return_objects=True, schema_repair_mode="standard") == expected
-    assert repair_json(raw, schema=schema, return_objects=True, schema_repair_mode="salvage") == expected
+    assert (
+        repair_json(
+            raw, schema=schema, return_objects=True, schema_repair_mode="standard"
+        )
+        == expected
+    )
+    assert (
+        repair_json(
+            raw, schema=schema, return_objects=True, schema_repair_mode="salvage"
+        )
+        == expected
+    )
 
-    repaired, logs = repair_json(raw, schema=schema, logging=True, schema_repair_mode="standard")
+    repaired, logs = repair_json(
+        raw, schema=schema, logging=True, schema_repair_mode="standard"
+    )
     assert repaired == expected
-    assert any(log["text"] == "Unwrapped JSON string to object to match schema" for log in logs)
+    assert any(
+        log["text"] == "Unwrapped JSON string to object to match schema" for log in logs
+    )
 
 
 def test_schema_salvage_repairs_malformed_double_serialized_object_string():
@@ -187,13 +324,25 @@ def test_schema_salvage_repairs_malformed_double_serialized_object_string():
     expected = {"summary": {"verdict": "malicious", "confidence": "high"}}
 
     with pytest.raises(ValueError, match=r"Expected object at \$.summary, got str\."):
-        repair_json(raw, schema=schema, return_objects=True, schema_repair_mode="standard")
+        repair_json(
+            raw, schema=schema, return_objects=True, schema_repair_mode="standard"
+        )
 
-    assert repair_json(raw, schema=schema, return_objects=True, schema_repair_mode="salvage") == expected
+    assert (
+        repair_json(
+            raw, schema=schema, return_objects=True, schema_repair_mode="salvage"
+        )
+        == expected
+    )
 
-    repaired, logs = repair_json(raw, schema=schema, logging=True, schema_repair_mode="salvage")
+    repaired, logs = repair_json(
+        raw, schema=schema, logging=True, schema_repair_mode="salvage"
+    )
     assert repaired == expected
-    assert any(log["text"] == "Repaired malformed JSON string to object to match schema" for log in logs)
+    assert any(
+        log["text"] == "Repaired malformed JSON string to object to match schema"
+        for log in logs
+    )
 
 
 def test_schema_unwraps_double_serialized_array_in_all_modes():
@@ -211,12 +360,26 @@ def test_schema_unwraps_double_serialized_array_in_all_modes():
     raw = '{"items": "[\\"a\\", \\"b\\"]"}'
     expected = {"items": ["a", "b"]}
 
-    assert repair_json(raw, schema=schema, return_objects=True, schema_repair_mode="standard") == expected
-    assert repair_json(raw, schema=schema, return_objects=True, schema_repair_mode="salvage") == expected
+    assert (
+        repair_json(
+            raw, schema=schema, return_objects=True, schema_repair_mode="standard"
+        )
+        == expected
+    )
+    assert (
+        repair_json(
+            raw, schema=schema, return_objects=True, schema_repair_mode="salvage"
+        )
+        == expected
+    )
 
-    repaired, logs = repair_json(raw, schema=schema, logging=True, schema_repair_mode="standard")
+    repaired, logs = repair_json(
+        raw, schema=schema, logging=True, schema_repair_mode="standard"
+    )
     assert repaired == expected
-    assert any(log["text"] == "Unwrapped JSON string to array to match schema" for log in logs)
+    assert any(
+        log["text"] == "Unwrapped JSON string to array to match schema" for log in logs
+    )
 
 
 def test_schema_salvage_repairs_malformed_double_serialized_array_string():
@@ -235,12 +398,27 @@ def test_schema_salvage_repairs_malformed_double_serialized_array_string():
     standard_expected = {"items": ["[a, b]"]}
     salvage_expected = {"items": ["a", "b"]}
 
-    assert repair_json(raw, schema=schema, return_objects=True, schema_repair_mode="standard") == standard_expected
-    assert repair_json(raw, schema=schema, return_objects=True, schema_repair_mode="salvage") == salvage_expected
+    assert (
+        repair_json(
+            raw, schema=schema, return_objects=True, schema_repair_mode="standard"
+        )
+        == standard_expected
+    )
+    assert (
+        repair_json(
+            raw, schema=schema, return_objects=True, schema_repair_mode="salvage"
+        )
+        == salvage_expected
+    )
 
-    repaired, logs = repair_json(raw, schema=schema, logging=True, schema_repair_mode="salvage")
+    repaired, logs = repair_json(
+        raw, schema=schema, logging=True, schema_repair_mode="salvage"
+    )
     assert repaired == salvage_expected
-    assert any(log["text"] == "Repaired malformed JSON string to array to match schema" for log in logs)
+    assert any(
+        log["text"] == "Repaired malformed JSON string to array to match schema"
+        for log in logs
+    )
 
 
 def test_schema_object_string_unwrap_preserves_existing_failures():
@@ -277,11 +455,18 @@ def test_schema_array_string_unwrap_preserves_existing_fallbacks():
         "required": ["items"],
     }
 
-    assert repair_json('{"items": "not json"}', schema=schema, return_objects=True) == {"items": ["not json"]}
-    assert repair_json('{"items": "{\\"a\\": 1}"}', schema=schema, return_objects=True) == {"items": ['{"a": 1}']}
-    assert repair_json('{"items": "{a: 1}"}', schema=schema, return_objects=True, schema_repair_mode="salvage") == {
-        "items": ["{a: 1}"]
+    assert repair_json('{"items": "not json"}', schema=schema, return_objects=True) == {
+        "items": ["not json"]
     }
+    assert repair_json(
+        '{"items": "{\\"a\\": 1}"}', schema=schema, return_objects=True
+    ) == {"items": ['{"a": 1}']}
+    assert repair_json(
+        '{"items": "{a: 1}"}',
+        schema=schema,
+        return_objects=True,
+        schema_repair_mode="salvage",
+    ) == {"items": ["{a: 1}"]}
 
 
 def test_deep_allof_schema_raises_value_error_instead_of_recursion_error():
@@ -326,7 +511,10 @@ def test_schema_preserves_prefixed_valid_json_string_content():
                 "type": "array",
                 "items": {
                     "type": "object",
-                    "properties": {"text": {"type": "string"}, "id": {"type": "integer"}},
+                    "properties": {
+                        "text": {"type": "string"},
+                        "id": {"type": "integer"},
+                    },
                     "required": ["text", "id"],
                     "additionalProperties": False,
                 },
@@ -336,7 +524,9 @@ def test_schema_preserves_prefixed_valid_json_string_content():
     }
     raw = 'Preamble\n{"items": [{"text": "a\\n, extra: 1", "id": 8}]}'
 
-    assert repair_json(raw, schema=schema, return_objects=True) == {"items": [{"text": "a\n, extra: 1", "id": 8}]}
+    assert repair_json(raw, schema=schema, return_objects=True) == {
+        "items": [{"text": "a\n, extra: 1", "id": 8}]
+    }
 
 
 def test_schema_applies_to_valid_empty_string():
@@ -346,9 +536,16 @@ def test_schema_applies_to_valid_empty_string():
 
 def test_schema_skip_json_loads_keeps_parser_path_for_scalars():
     pytest.importorskip("jsonschema")
-    assert repair_json("True", schema={"type": "string"}, skip_json_loads=True, return_objects=True) == ""
+    assert (
+        repair_json(
+            "True", schema={"type": "string"}, skip_json_loads=True, return_objects=True
+        )
+        == ""
+    )
     with pytest.raises(ValueError, match="is not of type"):
-        repair_json('"1"', schema={"type": "integer"}, skip_json_loads=True, return_objects=True)
+        repair_json(
+            '"1"', schema={"type": "integer"}, skip_json_loads=True, return_objects=True
+        )
 
 
 def test_schema_circular_ref_raises_definition_error():
@@ -392,8 +589,14 @@ def test_schema_pydantic_v2_defaults():
     [
         ('{\n"a": "\n```{}```\n",\n"b": "x",\n}', {"a": "\n```{}```", "b": "x"}),
         ('{\n"a": "\n```{}```\n"\n",\n"b": "x",\n}', {"a": '\n```{}```\n"', "b": "x"}),
-        ('{\n"a": "\n```{}```\n"\n",\n\'b\': "x",\n}', {"a": '\n```{}```\n"', "b": "x"}),
-        ('{\n"a": "\n```{}```\n"\n", // c\n"b": "x",\n}', {"a": '\n```{}```\n"', "b": "x"}),
+        (
+            '{\n"a": "\n```{}```\n"\n",\n\'b\': "x",\n}',
+            {"a": '\n```{}```\n"', "b": "x"},
+        ),
+        (
+            '{\n"a": "\n```{}```\n"\n", // c\n"b": "x",\n}',
+            {"a": '\n```{}```\n"', "b": "x"},
+        ),
         ('{\n"a": "\n```{}```\n"\n",\n b: "x",\n}', {"a": '\n```{}```\n"', "b": "x"}),
         ('{"a":"```}```"a","b":"x"}', {"a": '```}```"a', "b": "x"}),
         ('{"a":"x}``` [1,2]\n","b":"y"}', {"a": "x}``` [1,2]", "b": "y"}),
@@ -407,7 +610,10 @@ def test_schema_pydantic_v2_defaults():
         ('{"a":"x}``` (1,(2),k:v)\n","b":"y"}', {"a": "x}``` (1,(2),k:v)", "b": "y"}),
         ('{"a":"x}``` [1,2],\n","b":"y"}', {"a": "x}``` [1,2],", "b": "y"}),
         ('{"a":"x}``` // c\n [1,2]\n","b":"y"}', {"a": "x}``` // c\n [1,2]", "b": "y"}),
-        ('{"a":"x}``` // c\n [1,2],\n","b":"y"}', {"a": "x}``` // c\n [1,2],", "b": "y"}),
+        (
+            '{"a":"x}``` // c\n [1,2],\n","b":"y"}',
+            {"a": "x}``` // c\n [1,2],", "b": "y"},
+        ),
         (
             '{\n"a": "\n```c\nint main() {\n}\n```\nImplementation: "xxx", xxx\n",\n"b": "x",\n}',
             {"a": '\n```c\nint main() {\n}\n```\nImplementation: "xxx", xxx', "b": "x"},
@@ -448,7 +654,9 @@ def test_schema_boolean_coercion_is_mode_independent():
     }
 
     raw = '{"flag": "yes"}'
-    default_mode = repair_json(raw, schema=schema, skip_json_loads=True, return_objects=True)
+    default_mode = repair_json(
+        raw, schema=schema, skip_json_loads=True, return_objects=True
+    )
     standard_mode = repair_json(
         raw,
         schema=schema,
@@ -523,7 +731,9 @@ def test_schema_salvage_mode_drops_invalid_array_items():
     )
     assert repaired_with_logs == {"items": [{"id": 1, "score": 85.6}]}
     assert isinstance(logs, list)
-    assert any(log["text"] == "Dropped invalid array item while salvaging" for log in logs)
+    assert any(
+        log["text"] == "Dropped invalid array item while salvaging" for log in logs
+    )
 
 
 def test_schema_salvage_mode_still_enforces_min_items():
@@ -586,7 +796,13 @@ def test_schema_salvage_mode_maps_set_like_object_members_to_null_valued_keys():
     raw = '{"a", "b"}'
 
     with pytest.raises(ValueError, match="Expected object"):
-        repair_json(raw, schema=schema, skip_json_loads=True, return_objects=True, schema_repair_mode="standard")
+        repair_json(
+            raw,
+            schema=schema,
+            skip_json_loads=True,
+            return_objects=True,
+            schema_repair_mode="standard",
+        )
 
     assert repair_json(
         raw,
@@ -616,7 +832,9 @@ def test_schema_salvage_mode_maps_set_like_object_members_to_null_valued_keys():
         ),
     )
     assert repaired_with_logs == {"a": None, "b": None}
-    assert any("set-like members as null-valued object keys" in log["text"] for log in logs)
+    assert any(
+        "set-like members as null-valued object keys" in log["text"] for log in logs
+    )
 
 
 def test_schema_salvage_mode_set_like_members_do_not_override_mixed_object_array_schema():
@@ -717,8 +935,12 @@ def test_schema_salvage_mode_union_object_array_falls_back_to_valid_array_branch
     }
     raw = '["bbb",]'
 
-    assert repair_json(raw, schema=schema, return_objects=True, schema_repair_mode="standard") == ["bbb"]
-    assert repair_json(raw, schema=schema, return_objects=True, schema_repair_mode="salvage") == ["bbb"]
+    assert repair_json(
+        raw, schema=schema, return_objects=True, schema_repair_mode="standard"
+    ) == ["bbb"]
+    assert repair_json(
+        raw, schema=schema, return_objects=True, schema_repair_mode="salvage"
+    ) == ["bbb"]
 
 
 def test_schema_salvage_mode_union_object_array_does_not_remap_valid_array():
@@ -825,9 +1047,13 @@ def test_schema_salvage_mode_unwraps_root_single_item_array_and_fills_required_a
         "type": "food_sport_card",
         "content": {"food": ["mantou"], "sports": []},
     }
-    assert any(log["text"] == "Unwrapped single-item root array to object while salvaging" for log in logs)
     assert any(
-        log["text"] == "Filled missing required property while salvaging" and log["context"] == "$.content.sports"
+        log["text"] == "Unwrapped single-item root array to object while salvaging"
+        for log in logs
+    )
+    assert any(
+        log["text"] == "Filled missing required property while salvaging"
+        and log["context"] == "$.content.sports"
         for log in logs
     )
 

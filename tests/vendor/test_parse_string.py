@@ -13,7 +13,9 @@ from src.json_repair.parse_string import (
     _starts_nested_inline_container,
     _try_parse_simple_quoted_string,
 )
-from src.json_repair.parse_string_helpers.object_value_context import update_inline_container_stack
+from src.json_repair.parse_string_helpers.object_value_context import (
+    update_inline_container_stack,
+)
 from src.json_repair.utils.json_context import ContextValues
 from src.json_repair.utils.string_file_wrapper import StringFileWrapper
 
@@ -43,7 +45,9 @@ def test_parse_string():
 
 def test_missing_and_mixed_quotes():
     assert (
-        repair_json("{'key': 'string', 'key2': false, \"key3\": null, \"key4\": unquoted}")
+        repair_json(
+            "{'key': 'string', 'key2': false, \"key3\": null, \"key4\": unquoted}"
+        )
         == '{"key": "string", "key2": false, "key3": null, "key4": "unquoted"}'
     )
     assert (
@@ -62,8 +66,14 @@ def test_missing_and_mixed_quotes():
         repair_json('{"name": John, "age": 30, "city": "New York"}')
         == '{"name": "John", "age": 30, "city": "New York"}'
     )
-    assert repair_json('{“slanted_delimiter”: "value"}') == '{"slanted_delimiter": "value"}'
-    assert repair_json('{"name": "John", "age": 30, "city": "New') == '{"name": "John", "age": 30, "city": "New"}'
+    assert (
+        repair_json('{“slanted_delimiter”: "value"}')
+        == '{"slanted_delimiter": "value"}'
+    )
+    assert (
+        repair_json('{"name": "John", "age": 30, "city": "New')
+        == '{"name": "John", "age": 30, "city": "New"}'
+    )
     assert (
         repair_json('{"name": "John", "age": 30, "city": "New York, "gender": "male"}')
         == '{"name": "John", "age": 30, "city": "New York", "gender": "male"}'
@@ -74,12 +84,18 @@ def test_missing_and_mixed_quotes():
         == '[{"key": "value", "notes": "lorem \\"ipsum\\", sic."}]'
     )
     assert repair_json('{"key": ""value"}') == '{"key": "value"}'
-    assert repair_json('{"key": "value", 5: "value"}') == '{"key": "value", "5": "value"}'
+    assert (
+        repair_json('{"key": "value", 5: "value"}') == '{"key": "value", "5": "value"}'
+    )
     assert repair_json('{"foo": "\\"bar\\""') == '{"foo": "\\"bar\\""}'
     assert repair_json('{"" key":"val"') == '{" key": "val"}'
-    assert repair_json('{"key": value "key2" : "value2" ') == '{"key": "value", "key2": "value2"}'
     assert (
-        repair_json('{"key": "lorem ipsum ... "sic " tamet. ...}') == '{"key": "lorem ipsum ... \\"sic \\" tamet. ..."}'
+        repair_json('{"key": value "key2" : "value2" ')
+        == '{"key": "value", "key2": "value2"}'
+    )
+    assert (
+        repair_json('{"key": "lorem ipsum ... "sic " tamet. ...}')
+        == '{"key": "lorem ipsum ... \\"sic \\" tamet. ..."}'
     )
     assert repair_json('{"key": value , }') == '{"key": "value"}'
     assert (
@@ -87,8 +103,14 @@ def test_missing_and_mixed_quotes():
         == '{"comment": "lorem, \\"ipsum\\" sic \\"tamet\\". To improve"}'
     )
     assert repair_json('{"key": "v"alu"e"} key:') == '{"key": "v\\"alu\\"e"}'
-    assert repair_json('{"key": "v"alue", "key2": "value2"}') == '{"key": "v\\"alue", "key2": "value2"}'
-    assert repair_json('[{"key": "v"alu,e", "key2": "value2"}]') == '[{"key": "v\\"alu,e", "key2": "value2"}]'
+    assert (
+        repair_json('{"key": "v"alue", "key2": "value2"}')
+        == '{"key": "v\\"alue", "key2": "value2"}'
+    )
+    assert (
+        repair_json('[{"key": "v"alu,e", "key2": "value2"}]')
+        == '[{"key": "v\\"alu,e", "key2": "value2"}]'
+    )
 
 
 def test_object_value_comma_without_future_delimiter_scans_once():
@@ -128,7 +150,9 @@ def test_parse_string_keeps_colon_prose_inside_wrapped_valid_json():
         "stuff": [
             {
                 "a": "foo",
-                "blist": [{"text": "a\n b c, floof: a\n ... a b (c), floof: \n a", "id": 8}],
+                "blist": [
+                    {"text": "a\n b c, floof: a\n ... a b (c), floof: \n a", "id": 8}
+                ],
             }
         ]
     }
@@ -136,22 +160,32 @@ def test_parse_string_keeps_colon_prose_inside_wrapped_valid_json():
     _assert_object_repairs(raw, expected)
     repaired, logs = repair_json(raw, return_objects=True, logging=True)
     assert repaired == expected
-    assert not any("comma that starts the next object member" in log["text"] for log in logs)
+    assert not any(
+        "comma that starts the next object member" in log["text"] for log in logs
+    )
 
 
 def test_parse_string_keeps_code_like_content_inside_valid_json():
     raw = r'{"command":"x\nrollback: (registry: Registry, snapshot: EntitySnapshot) => void;"}'
-    expected = {"command": "x\nrollback: (registry: Registry, snapshot: EntitySnapshot) => void;"}
+    expected = {
+        "command": "x\nrollback: (registry: Registry, snapshot: EntitySnapshot) => void;"
+    }
 
     _assert_object_repairs(raw, expected)
-    repaired, logs = repair_json(raw, skip_json_loads=True, return_objects=True, logging=True)
+    repaired, logs = repair_json(
+        raw, skip_json_loads=True, return_objects=True, logging=True
+    )
     assert repaired == expected
-    assert not any("comma that starts the next object member" in log["text"] for log in logs)
+    assert not any(
+        "comma that starts the next object member" in log["text"] for log in logs
+    )
 
 
 def test_parse_string_keeps_pseudo_object_code_inside_valid_json():
     raw = r'{"command":"x\nrollback: {registry: Registry, snapshot: EntitySnapshot}"}'
-    expected = {"command": "x\nrollback: {registry: Registry, snapshot: EntitySnapshot}"}
+    expected = {
+        "command": "x\nrollback: {registry: Registry, snapshot: EntitySnapshot}"
+    }
 
     _assert_object_repairs(raw, expected)
 
@@ -166,13 +200,17 @@ def test_parse_string_keeps_pseudo_object_code_inside_valid_json():
         ('{"a": "first, b: prose}', {"a": "first", "b": "prose"}),
     ],
 )
-def test_parse_string_keeps_bare_member_recovery_for_explicit_and_unclosed_values(raw, expected):
+def test_parse_string_keeps_bare_member_recovery_for_explicit_and_unclosed_values(
+    raw, expected
+):
     assert repair_json(raw, skip_json_loads=True, return_objects=True) == expected
 
 
 def test_escaping():
     assert repair_json("'\"'") == ""
-    assert repair_json('{"key": \'string"\n\t\\le\'') == '{"key": "string\\"\\n\\t\\\\le"}'
+    assert (
+        repair_json('{"key": \'string"\n\t\\le\'') == '{"key": "string\\"\\n\\t\\\\le"}'
+    )
     assert (
         repair_json(
             r'{"real_content": "Some string: Some other string \t Some string <a href=\"https://domain.com\">Some link</a>"'
@@ -181,10 +219,20 @@ def test_escaping():
     )
     assert repair_json('{"key_1\n": "value"}') == '{"key_1": "value"}'
     assert repair_json('{"key\t_": "value"}') == '{"key\\t_": "value"}'
-    assert repair_json("{\"key\": '\u0076\u0061\u006c\u0075\u0065'}") == '{"key": "value"}'
-    assert repair_json('{"key": "\\u0076\\u0061\\u006C\\u0075\\u0065"}', skip_json_loads=True) == '{"key": "value"}'
+    assert (
+        repair_json("{\"key\": '\u0076\u0061\u006c\u0075\u0065'}") == '{"key": "value"}'
+    )
+    assert (
+        repair_json(
+            '{"key": "\\u0076\\u0061\\u006C\\u0075\\u0065"}', skip_json_loads=True
+        )
+        == '{"key": "value"}'
+    )
     assert repair_json("""{"key": "valu\\'e"}""") == """{"key": "valu'e"}"""
-    assert repair_json('{\'key\': "{\\"key\\": 1, \\"key2\\": 1}"}') == '{"key": "{\\"key\\": 1, \\"key2\\": 1}"}'
+    assert (
+        repair_json('{\'key\': "{\\"key\\": 1, \\"key2\\": 1}"}')
+        == '{"key": "{\\"key\\": 1, \\"key2\\": 1}"}'
+    )
 
 
 def test_markdown():
@@ -193,7 +241,10 @@ def test_markdown():
         == '{"content": "[LINK](\\"https://google.com\\")"}'
     )
     assert repair_json('{ "content": "[LINK](" }') == '{"content": "[LINK]("}'
-    assert repair_json('{ "content": "[LINK](", "key": true }') == '{"content": "[LINK](", "key": true}'
+    assert (
+        repair_json('{ "content": "[LINK](", "key": true }')
+        == '{"content": "[LINK](", "key": true}'
+    )
 
 
 @pytest.mark.parametrize(
@@ -219,7 +270,11 @@ def test_parse_string_keeps_bare_quotes_inside_regex_character_classes(fenced):
 
 
 def test_parse_string_still_closes_regular_object_members_after_quoted_values():
-    assert repair_json('{"first": "value", "second": "next"}', return_objects=True, skip_json_loads=True) == {
+    assert repair_json(
+        '{"first": "value", "second": "next"}',
+        return_objects=True,
+        skip_json_loads=True,
+    ) == {
         "first": "value",
         "second": "next",
     }
@@ -227,9 +282,14 @@ def test_parse_string_still_closes_regular_object_members_after_quoted_values():
 
 def test_leading_trailing_characters():
     assert repair_json('````{ "key": "value" }```') == '{"key": "value"}'
-    assert repair_json("""{    "a": "",    "b": [ { "c": 1} ] \n}```""") == '{"a": "", "b": [{"c": 1}]}'
     assert (
-        repair_json("Based on the information extracted, here is the filled JSON output: ```json { 'a': 'b' } ```")
+        repair_json("""{    "a": "",    "b": [ { "c": 1} ] \n}```""")
+        == '{"a": "", "b": [{"c": 1}]}'
+    )
+    assert (
+        repair_json(
+            "Based on the information extracted, here is the filled JSON output: ```json { 'a': 'b' } ```"
+        )
         == '{"a": "b"}'
     )
     assert (
@@ -265,7 +325,9 @@ def test_fenced_json_wrapper_matches_plain_for_duplicate_keys():
     ]
     }
     """
-    assert repair_json(fenced, return_objects=True) == repair_json(plain, return_objects=True)
+    assert repair_json(fenced, return_objects=True) == repair_json(
+        plain, return_objects=True
+    )
 
 
 def test_string_json_llm_block():
@@ -279,7 +341,12 @@ def test_string_json_llm_block():
 
 
 def test_parse_string_logs_invalid_code_fences():
-    repaired, logs = repair_json('{"key": "```json nope\\n"}', skip_json_loads=True, return_objects=True, logging=True)
+    repaired, logs = repair_json(
+        '{"key": "```json nope\\n"}',
+        skip_json_loads=True,
+        return_objects=True,
+        logging=True,
+    )
     assert repaired == {"key": "```json nope"}
     assert any("did not enclose valid JSON" in log["text"] for log in logs)
 
@@ -289,8 +356,14 @@ def test_parse_string_logs_invalid_code_fences():
     [
         ('{\n"a": "\n```{}```\n",\n"b": "x",\n}', {"a": "\n```{}```", "b": "x"}),
         ('{\n"a": "\n```{}```\n"\n",\n"b": "x",\n}', {"a": '\n```{}```\n"', "b": "x"}),
-        ('{\n"a": "\n```{}```\n"\n",\n\'b\': "x",\n}', {"a": '\n```{}```\n"', "b": "x"}),
-        ('{\n"a": "\n```{}```\n"\n", // c\n"b": "x",\n}', {"a": '\n```{}```\n"', "b": "x"}),
+        (
+            '{\n"a": "\n```{}```\n"\n",\n\'b\': "x",\n}',
+            {"a": '\n```{}```\n"', "b": "x"},
+        ),
+        (
+            '{\n"a": "\n```{}```\n"\n", // c\n"b": "x",\n}',
+            {"a": '\n```{}```\n"', "b": "x"},
+        ),
         ('{\n"a": "\n```{}```\n"\n",\n b: "x",\n}', {"a": '\n```{}```\n"', "b": "x"}),
         ('{"a":"```}```"a","b":"x"}', {"a": '```}```"a', "b": "x"}),
         ('{"a":"x}``` [1,2]\n","b":"y"}', {"a": "x}``` [1,2]", "b": "y"}),
@@ -304,7 +377,10 @@ def test_parse_string_logs_invalid_code_fences():
         ('{"a":"x}``` (1,(2),k:v)\n","b":"y"}', {"a": "x}``` (1,(2),k:v)", "b": "y"}),
         ('{"a":"x}``` [1,2],\n","b":"y"}', {"a": "x}``` [1,2],", "b": "y"}),
         ('{"a":"x}``` // c\n [1,2]\n","b":"y"}', {"a": "x}``` // c\n [1,2]", "b": "y"}),
-        ('{"a":"x}``` // c\n [1,2],\n","b":"y"}', {"a": "x}``` // c\n [1,2],", "b": "y"}),
+        (
+            '{"a":"x}``` // c\n [1,2],\n","b":"y"}',
+            {"a": "x}``` // c\n [1,2],", "b": "y"},
+        ),
         (
             '{\n"a": "\n```c\nint main() {\n}\n```\nImplementation: "xxx", xxx\n",\n"b": "x",\n}',
             {"a": '\n```c\nint main() {\n}\n```\nImplementation: "xxx", xxx', "b": "x"},
@@ -345,7 +421,10 @@ def test_parse_string_stray_quote_line_before_trailing_comma_at_eof_drops_stray_
 
 
 def test_parse_string_keeps_multiline_curly_quoted_prose_after_comma():
-    _assert_object_repairs('{"x": "a,\n “term”: explanation", "y": 2}', {"x": "a,\n “term”: explanation", "y": 2})
+    _assert_object_repairs(
+        '{"x": "a,\n “term”: explanation", "y": 2}',
+        {"x": "a,\n “term”: explanation", "y": 2},
+    )
 
 
 def test_parse_string_keeps_low_smart_quote_span_closed_by_ascii_quote():
@@ -383,12 +462,55 @@ def test_parse_boolean_or_null():
     assert repair_json("true", return_objects=True)
     assert not repair_json("false", return_objects=True)
     assert repair_json("null", return_objects=True) is None
-    assert repair_json('  {"key": true, "key2": false, "key3": null}') == '{"key": true, "key2": false, "key3": null}'
-    assert repair_json('{"key": TRUE, "key2": FALSE, "key3": Null}   ') == '{"key": true, "key2": false, "key3": null}'
+    assert (
+        repair_json('  {"key": true, "key2": false, "key3": null}')
+        == '{"key": true, "key2": false, "key3": null}'
+    )
+    assert (
+        repair_json('{"key": TRUE, "key2": FALSE, "key3": Null}   ')
+        == '{"key": true, "key2": false, "key3": null}'
+    )
+
+
+def test_parse_literals_require_boundaries_and_support_python_none():
+    assert repair_json('{"value": None }', return_objects=True) == {"value": None}
+    assert repair_json("[None, TRUE, false, Null]", return_objects=True) == [
+        None,
+        True,
+        False,
+        None,
+    ]
+    assert repair_json("[None", return_objects=True) == [None]
+    assert repair_json('{"value": "None"}', return_objects=True) == {"value": "None"}
+    assert repair_json('{"value": none}', return_objects=True) == {"value": None}
+    assert repair_json('{"value": NONE}', return_objects=True) == {"value": None}
+    assert repair_json('{"value": trueblue}', return_objects=True) == {
+        "value": "trueblue"
+    }
+    assert repair_json('{"value": falsehood}', return_objects=True) == {
+        "value": "falsehood"
+    }
+    assert repair_json('{"value": nullify}', return_objects=True) == {
+        "value": "nullify"
+    }
+    assert repair_json('{"value": NoneType}', return_objects=True) == {
+        "value": "NoneType"
+    }
+
+    repaired, logs = repair_json('{"value": None}', return_objects=True, logging=True)
+    assert repaired == {"value": None}
+    assert any(
+        log["text"] == "Converted unquoted Python None literal to JSON null"
+        for log in logs
+    )
 
 
 def test_parse_string_fast_path_keeps_clean_values_log_free():
-    repaired, logs = repair_json('{"key": "value", "items": ["alpha", "beta"]}', return_objects=True, logging=True)
+    repaired, logs = repair_json(
+        '{"key": "value", "items": ["alpha", "beta"]}',
+        return_objects=True,
+        logging=True,
+    )
     assert repaired == {"key": "value", "items": ["alpha", "beta"]}
     assert logs == []
 
@@ -401,7 +523,9 @@ def test_parse_string_fast_path_falls_back_for_escapes_with_logs():
         logging=True,
     )
     assert repaired == {"key": "value"}
-    assert any(log["text"] == "Found a unicode escape sequence, normalizing it" for log in logs)
+    assert any(
+        log["text"] == "Found a unicode escape sequence, normalizing it" for log in logs
+    )
 
 
 def test_parse_string_fast_path_rejects_ambiguous_top_level_trailing_text():
@@ -449,19 +573,25 @@ def test_parse_string_object_value_brace_heuristics():
 def test_parse_string_far_quote_comma_payload_keeps_existing_repair_shape():
     raw = '{"a": "' + ("x," * 10_000) + '" tail'
 
-    assert repair_json(raw, return_objects=True, skip_json_loads=True) == {"a": "x," * 10_000}
+    assert repair_json(raw, return_objects=True, skip_json_loads=True) == {
+        "a": "x," * 10_000
+    }
 
 
 def test_parse_string_far_quote_brace_payload_keeps_existing_repair_shape():
     raw = '{"a": "' + ("x}" * 5_000) + '" tail'
 
-    assert repair_json(raw, return_objects=True, skip_json_loads=True) == {"a": "x}" * 5_000}
+    assert repair_json(raw, return_objects=True, skip_json_loads=True) == {
+        "a": "x}" * 5_000
+    }
 
 
 def test_parse_string_preserves_escaped_braces_after_comma_group():
     raw = r'{ "key": "\\{1,2\\} \\{3\\}" }'
 
-    assert repair_json(raw, return_objects=True, skip_json_loads=True) == {"key": r"\{1,2\} \{3\}"}
+    assert repair_json(raw, return_objects=True, skip_json_loads=True) == {
+        "key": r"\{1,2\} \{3\}"
+    }
 
 
 @pytest.mark.parametrize(
@@ -471,16 +601,22 @@ def test_parse_string_preserves_escaped_braces_after_comma_group():
         (r'{"key": "1\\\\2\\\\3",}', r"1\\2\\3", r'{"key": "1\\\\2\\\\3"}'),
     ],
 )
-def test_parse_string_preserves_repeated_escaped_backslashes_during_repair(raw, expected, serialized):
+def test_parse_string_preserves_repeated_escaped_backslashes_during_repair(
+    raw, expected, serialized
+):
     for skip_json_loads in (False, True):
-        assert repair_json(raw, return_objects=True, skip_json_loads=skip_json_loads) == {"key": expected}
+        assert repair_json(
+            raw, return_objects=True, skip_json_loads=skip_json_loads
+        ) == {"key": expected}
         assert repair_json(raw, skip_json_loads=skip_json_loads) == serialized
 
 
 def test_parse_string_preserves_latex_command_after_bracketed_comma():
     raw = r'{ "key": "x [0,2] f(-\\frac{3}{4})" }'
 
-    assert repair_json(raw, return_objects=True, skip_json_loads=True) == {"key": r"x [0,2] f(-\frac{3}{4})"}
+    assert repair_json(raw, return_objects=True, skip_json_loads=True) == {
+        "key": r"x [0,2] f(-\frac{3}{4})"
+    }
 
 
 def test_parse_string_keeps_latex_braces_before_inline_object_literal():
@@ -493,7 +629,9 @@ def test_parse_string_keeps_latex_braces_before_inline_object_literal():
 
 
 def test_parse_string_missing_quotes_object_value_stops_at_quote_fragment():
-    assert repair_json('{0:a"0"', return_objects=True, skip_json_loads=True) == {"0": "a"}
+    assert repair_json('{0:a"0"', return_objects=True, skip_json_loads=True) == {
+        "0": "a"
+    }
 
 
 def test_parse_string_fast_path_string_wrapper_fallbacks():
@@ -663,8 +801,8 @@ def test_skip_inline_container_rejects_unterminated_block_comment():
 
 def test_update_inline_container_stack_starts_tracking_pending_container():
     inline_container_stack: list[str] = []
-    pending_inline_container, keep_inline_container_char = update_inline_container_stack(
-        "[", True, inline_container_stack
+    pending_inline_container, keep_inline_container_char = (
+        update_inline_container_stack("[", True, inline_container_stack)
     )
 
     assert not pending_inline_container
@@ -674,8 +812,8 @@ def test_update_inline_container_stack_starts_tracking_pending_container():
 
 def test_update_inline_container_stack_tracks_nested_container():
     inline_container_stack = ["["]
-    pending_inline_container, keep_inline_container_char = update_inline_container_stack(
-        "{", False, inline_container_stack
+    pending_inline_container, keep_inline_container_char = (
+        update_inline_container_stack("{", False, inline_container_stack)
     )
 
     assert not pending_inline_container
@@ -685,8 +823,8 @@ def test_update_inline_container_stack_tracks_nested_container():
 
 def test_update_inline_container_stack_keeps_closing_container_character():
     inline_container_stack = ["["]
-    pending_inline_container, keep_inline_container_char = update_inline_container_stack(
-        "]", False, inline_container_stack
+    pending_inline_container, keep_inline_container_char = (
+        update_inline_container_stack("]", False, inline_container_stack)
     )
 
     assert not pending_inline_container

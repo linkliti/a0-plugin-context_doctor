@@ -143,9 +143,7 @@ class StringFileWrapper:
 
         start_slice = self.get_buffer(buffer_index)[start_mod:]
         end_slice = self.get_buffer(buffer_end)[:stop_mod]
-        middle_slices = [
-            self.get_buffer(i) for i in range(buffer_index + 1, buffer_end)
-        ]
+        middle_slices = [self.get_buffer(i) for i in range(buffer_index + 1, buffer_end)]
         return start_slice + "".join(middle_slices) + end_slice
 
     def __setitem__(self, index: int | slice, value: str) -> None:  # pragma: no cover

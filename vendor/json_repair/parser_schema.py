@@ -24,9 +24,7 @@ class ArraySchemaConfig:
 def resolve_parser_object_schema(
     repairer: SchemaRepairer | None,
     schema: dict[str, Any] | bool | None,
-) -> tuple[
-    SchemaRepairer | None, dict[str, Any] | bool | None, ObjectSchemaConfig | None
-]:
+) -> tuple[SchemaRepairer | None, dict[str, Any] | bool | None, ObjectSchemaConfig | None]:
     if repairer is None or schema in (None, True):
         return None, schema, None
 
@@ -41,9 +39,7 @@ def resolve_parser_object_schema(
 def resolve_parser_array_schema(
     repairer: SchemaRepairer | None,
     schema: dict[str, Any] | bool | None,
-) -> tuple[
-    SchemaRepairer | None, dict[str, Any] | bool | None, ArraySchemaConfig | None
-]:
+) -> tuple[SchemaRepairer | None, dict[str, Any] | bool | None, ArraySchemaConfig | None]:
     if repairer is None or schema in (None, True):
         return None, schema, None
 

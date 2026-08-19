@@ -7,9 +7,7 @@ if TYPE_CHECKING:
     from ..json_parser import JSONParser  # noqa: TID252
 
 
-ObjectValueCommaClassification = Literal[
-    "container", "member", "string", "string_no_future_delimiter"
-]
+ObjectValueCommaClassification = Literal["container", "member", "string", "string_no_future_delimiter"]
 
 
 def _bare_member_has_recoverable_value(
@@ -25,10 +23,7 @@ def _bare_member_has_recoverable_value(
         return True
 
     for literal in ["true", "false", "null"]:
-        if all(
-            parser.get_char_at(value_start_idx + offset) == char
-            for offset, char in enumerate(literal)
-        ):
+        if all(parser.get_char_at(value_start_idx + offset) == char for offset, char in enumerate(literal)):
             value_end = parser.get_char_at(value_start_idx + len(literal))
             if value_end is None or value_end.isspace() or value_end in [",", "}", "]"]:
                 return True
@@ -75,9 +70,7 @@ def classify_object_value_comma(
                 break
             bare_key_idx += 1
         bare_key_idx = parser.scroll_whitespaces(idx=bare_key_idx)
-        if parser.get_char_at(
-            bare_key_idx
-        ) == ":" and _bare_member_has_recoverable_value(
+        if parser.get_char_at(bare_key_idx) == ":" and _bare_member_has_recoverable_value(
             parser,
             bare_key_idx + 1,
             skip_to_character,
@@ -114,8 +107,7 @@ def update_inline_container_stack(
             inline_container_stack.append(char)
 
     if inline_container_stack and (
-        (char == "}" and inline_container_stack[-1] == "{")
-        or (char == "]" and inline_container_stack[-1] == "[")
+        (char == "}" and inline_container_stack[-1] == "{") or (char == "]" and inline_container_stack[-1] == "[")
     ):
         inline_container_stack.pop()
         return pending_inline_container, True

@@ -21,20 +21,14 @@ def _finalize_object(
 
     missing_required = [key for key in schema_config.required if key not in obj]
     if missing_required and schema_repairer.schema_repair_mode != "salvage":
-        raise ValueError(
-            f"Missing required properties at {path}: {', '.join(missing_required)}"
-        )
+        raise ValueError(f"Missing required properties at {path}: {', '.join(missing_required)}")
 
     for key, prop_schema in schema_config.properties.items():
         if key in obj or key in schema_config.required:
             continue
         if isinstance(prop_schema, dict) and "default" in prop_schema:
-            obj[key] = schema_repairer._copy_json_value(
-                prop_schema["default"], f"{path}.{key}", "default"
-            )
-            schema_repairer._log(
-                "Inserted default value for missing property", f"{path}.{key}"
-            )
+            obj[key] = schema_repairer._copy_json_value(prop_schema["default"], f"{path}.{key}", "default")
+            schema_repairer._log("Inserted default value for missing property", f"{path}.{key}")
     return obj
 
 
@@ -97,9 +91,7 @@ def _classify_empty_object_repair(
     body = body.lstrip()
     if not body:
         return "keep", None
-    if (body.startswith('\\"') and '\\":' in body) or (
-        body.startswith("\\'") and "\\':" in body
-    ):
+    if (body.startswith('\\"') and '\\":' in body) or (body.startswith("\\'") and "\\':" in body):
         normalized_object = attempted_object.replace('\\"', '"').replace("\\'", "'")
         self.log(
             "Parsed object is empty but the input starts like an escaped object key, normalizing and reparsing it as an object",
@@ -152,10 +144,7 @@ def _merge_object_array_continuation(
         if isinstance(prev_value, list):
             list_lengths = [len(item) for item in prev_value if isinstance(item, list)]
             expected_len = (
-                list_lengths[0]
-                if list_lengths
-                and all(length == list_lengths[0] for length in list_lengths)
-                else None
+                list_lengths[0] if list_lengths and all(length == list_lengths[0] for length in list_lengths) else None
             )
             if expected_len:
                 tail = []
@@ -180,11 +169,7 @@ def _merge_object_array_continuation(
                     else:
                         prev_value.append(new_array)
             else:
-                prev_value.extend(
-                    new_array[0]
-                    if len(new_array) == 1 and isinstance(new_array[0], list)
-                    else new_array
-                )
+                prev_value.extend(new_array[0] if len(new_array) == 1 and isinstance(new_array[0], list) else new_array)
 
     self.skip_whitespaces()
     if self.get_char_at() == ",":
@@ -203,11 +188,7 @@ def _parse_object_key(
     try:
         while self.get_char_at():
             rollback_index = self.index
-            if (
-                self.get_char_at() == "["
-                and key == ""
-                and _merge_object_array_continuation(self, obj)
-            ):
+            if self.get_char_at() == "[" and key == "" and _merge_object_array_continuation(self, obj):
                 continue
 
             raw_key = self.parse_string()
@@ -220,9 +201,7 @@ def _parse_object_key(
                     self.log(
                         "Empty key found in strict mode while parsing object, raising an error",
                     )
-                    raise ValueError(
-                        "Empty key found in strict mode while parsing object."
-                    )
+                    raise ValueError("Empty key found in strict mode while parsing object.")
                 break
     finally:
         self.context.reset()
@@ -237,18 +216,12 @@ def _should_split_duplicate_object(self: "JSONParser", rollback_index: int) -> b
         prev_non_whitespace = self.get_char_at(lookback_idx)
     key_start_char = self.get_char_at(rollback_index - self.index)
     next_non_whitespace = self.get_char_at(self.scroll_whitespaces())
-    return not (
-        key_start_char in STRING_DELIMITERS
-        and prev_non_whitespace == ","
-        and next_non_whitespace == ":"
-    )
+    return not (key_start_char in STRING_DELIMITERS and prev_non_whitespace == "," and next_non_whitespace == ":")
 
 
 def _split_object_on_duplicate_key(self: "JSONParser", rollback_index: int) -> None:
     self.index = rollback_index - 1
-    self.json_str = (
-        self.json_str[: self.index + 1] + "{" + self.json_str[self.index + 1 :]
-    )
+    self.json_str = self.json_str[: self.index + 1] + "{" + self.json_str[self.index + 1 :]
 
 
 def _resolve_object_property_schema(
@@ -272,9 +245,7 @@ def _resolve_object_property_schema(
     matched: list[Any] = []
     unsupported_patterns: list[str] = []
     if schema_config.pattern_properties:
-        matched, unsupported_patterns = match_pattern_properties(
-            schema_config.pattern_properties, key
-        )
+        matched, unsupported_patterns = match_pattern_properties(schema_config.pattern_properties, key)
     for pattern in unsupported_patterns:
         self.log(
             f"Skipped unsupported patternProperties regex '{pattern}' while parsing object key '{key}'",
@@ -312,9 +283,7 @@ def _parse_object_value(
                 f"While parsing an object value we found a stray {char}, ignoring it",
             )
             if schema_repairer is not None:
-                return schema_repairer.repair_value(
-                    MISSING_VALUE, prop_schema, key_path
-                )
+                return schema_repairer.repair_value(MISSING_VALUE, prop_schema, key_path)
             return ""
 
         if schema_repairer is not None:
@@ -339,20 +308,12 @@ def _repair_empty_object_result(
         self.log(
             "Parsed object is empty but contains extra characters in strict mode, raising an error",
         )
-        raise ValueError(
-            "Parsed object is empty but contains extra characters in strict mode."
-        )
+        raise ValueError("Parsed object is empty but contains extra characters in strict mode.")
 
-    empty_object_repair, normalized_object = _classify_empty_object_repair(
-        self, start_index, schema, schema_repairer
-    )
+    empty_object_repair, normalized_object = _classify_empty_object_repair(self, start_index, schema, schema_repairer)
     if empty_object_repair == "object" and normalized_object is not None:
         end_index = self.index + 1
-        self.json_str = (
-            self.json_str[: start_index - 1]
-            + normalized_object
-            + self.json_str[end_index:]
-        )
+        self.json_str = self.json_str[: start_index - 1] + normalized_object + self.json_str[end_index:]
         self.index = start_index
         with self.context.enter(ContextValues.OBJECT_KEY):
             repaired_value = self.parse_object(schema, path)
@@ -367,16 +328,12 @@ def _repair_empty_object_result(
             set_items = self.parse_array()
         self.deferred_contexts.append(ContextValues.OBJECT_KEY)
         if isinstance(set_items, list):
-            key_candidates: list[str] = [
-                item for item in set_items if isinstance(item, str) and item
-            ]
+            key_candidates: list[str] = [item for item in set_items if isinstance(item, str) and item]
             if len(key_candidates) == len(set_items):
                 return True, cast("JSONReturnType", dict.fromkeys(key_candidates))
         return True, set_items
     if empty_object_repair == "array":
-        self.log(
-            "Parsed object is empty, we will try to parse this as an array instead"
-        )
+        self.log("Parsed object is empty, we will try to parse this as an array instead")
         self.index = start_index
         with self.context.enter(ContextValues.OBJECT_KEY):
             repaired_array = self.parse_array()
@@ -428,9 +385,7 @@ def parse_object(
     obj: dict[str, JSONReturnType] = {}
     start_index = self.index
     parsing_object_value = self.context.current == ContextValues.OBJECT_VALUE
-    schema_repairer, schema, schema_config = resolve_parser_object_schema(
-        self.schema_repairer, schema
-    )
+    schema_repairer, schema, schema_config = resolve_parser_object_schema(self.schema_repairer, schema)
 
     while (self.get_char_at() or "}") != "}":
         self.skip_whitespaces()
@@ -444,12 +399,8 @@ def parse_object(
         key, rollback_index = _parse_object_key(self, obj)
         if ContextValues.ARRAY in self.context.context and key in obj:
             if self.strict:
-                self.log(
-                    "Duplicate key found in strict mode while parsing object, raising an error"
-                )
-                raise ValueError(
-                    "Duplicate key found in strict mode while parsing object."
-                )
+                self.log("Duplicate key found in strict mode while parsing object, raising an error")
+                raise ValueError("Duplicate key found in strict mode while parsing object.")
             if not parsing_object_value:
                 if _should_split_duplicate_object(self, rollback_index):
                     self.log(
@@ -471,9 +422,7 @@ def parse_object(
                 self.log(
                     "Missing ':' after key in strict mode while parsing object, raising an error",
                 )
-                raise ValueError(
-                    "Missing ':' after key in strict mode while parsing object."
-                )
+                raise ValueError("Missing ':' after key in strict mode while parsing object.")
             self.log(
                 "While parsing an object we missed a : after a key",
             )
@@ -492,25 +441,16 @@ def parse_object(
             for extra_schema in extra_schemas:
                 value = schema_repairer.repair_value(value, extra_schema, key_path)
 
-        if (
-            schema_repairer is None
-            and value == ""
-            and self.strict
-            and self.get_char_at(-1) not in STRING_DELIMITERS
-        ):
+        if schema_repairer is None and value == "" and self.strict and self.get_char_at(-1) not in STRING_DELIMITERS:
             self.log(
                 "Parsed value is empty in strict mode while parsing object, raising an error",
             )
-            raise ValueError(
-                "Parsed value is empty in strict mode while parsing object."
-            )
+            raise ValueError("Parsed value is empty in strict mode while parsing object.")
 
         if schema_repairer is None or not drop_property:
             obj[key] = value
         else:
-            schema_repairer._log(
-                "Dropped extra property not covered by schema", key_path
-            )
+            schema_repairer._log("Dropped extra property not covered by schema", key_path)
 
         if self.get_char_at() in [",", "'", '"']:
             self.index += 1

@@ -23,7 +23,9 @@ def test_strict_rejects_adjacent_same_shape_top_level_arrays():
         repair_json("[1][2]", strict=True)
 
 
-@pytest.mark.parametrize("payload", ['{"key":"value"}[]', '{"key":"value"}{}', "[]{}", "{}[]", "[1]{}"])
+@pytest.mark.parametrize(
+    "payload", ['{"key":"value"}[]', '{"key":"value"}{}', "[]{}", "{}[]", "[1]{}"]
+)
 def test_strict_rejects_falsy_top_level_values(payload):
     with pytest.raises(ValueError, match="Multiple top-level JSON elements"):
         repair_json(payload, strict=True)
@@ -63,7 +65,9 @@ def test_strict_rejects_empty_escaped_object_with_extra_characters():
 
 
 def test_strict_detects_immediate_doubled_quotes():
-    with pytest.raises(ValueError, match=r"doubled quotes followed by another quote\.$"):
+    with pytest.raises(
+        ValueError, match=r"doubled quotes followed by another quote\.$"
+    ):
         repair_json('{"key": """"}', strict=True)
 
 

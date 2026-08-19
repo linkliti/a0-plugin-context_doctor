@@ -18,7 +18,9 @@ def parse_object_direct(raw, schema, *, strict=False, context=None):
 
 def parse_object_direct_with_mode(raw, schema, mode, *, strict=False, context=None):
     parser = JSONParser(raw, None, False, 0, False, strict)
-    repairer = SchemaRepairer(schema if isinstance(schema, dict) else {}, None, schema_repair_mode=mode)
+    repairer = SchemaRepairer(
+        schema if isinstance(schema, dict) else {}, None, schema_repair_mode=mode
+    )
     parser.schema_repairer = repairer
     if context is not None:
         parser.context.set(context)
@@ -36,7 +38,9 @@ def parse_array_direct(raw, schema):
 
 def parse_array_direct_with_mode(raw, schema, mode):
     parser = JSONParser(raw, None, False, 0, False, False)
-    repairer = SchemaRepairer(schema if isinstance(schema, dict) else {}, None, schema_repair_mode=mode)
+    repairer = SchemaRepairer(
+        schema if isinstance(schema, dict) else {}, None, schema_repair_mode=mode
+    )
     parser.schema_repairer = repairer
     parser.index = 1
     return parser.parse_array(schema, "$")
@@ -89,7 +93,9 @@ def test_parse_array_schema_missing_object_brace():
             "required": ["a"],
         },
     }
-    assert repair_json('["a": 1]', schema=schema, skip_json_loads=True, return_objects=True) == [{"a": 1}]
+    assert repair_json(
+        '["a": 1]', schema=schema, skip_json_loads=True, return_objects=True
+    ) == [{"a": 1}]
 
 
 def test_parse_object_schema_pattern_extra_schemas():
@@ -100,7 +106,9 @@ def test_parse_object_schema_pattern_extra_schemas():
             "1$": {"type": "integer"},
         },
     }
-    assert repair_json('{"x1": "2"}', schema=schema, skip_json_loads=True, return_objects=True) == {"x1": 2}
+    assert repair_json(
+        '{"x1": "2"}', schema=schema, skip_json_loads=True, return_objects=True
+    ) == {"x1": 2}
 
 
 def test_parse_object_schema_skips_unsupported_pattern_regex_with_log():
@@ -115,7 +123,10 @@ def test_parse_object_schema_skips_unsupported_pattern_regex_with_log():
     parser.index = 1
 
     assert parser.parse_object(schema, "$") == {"x1": 2}
-    assert any("Skipped unsupported patternProperties regex '^x[0-9]+$'" in entry["text"] for entry in parser.logger)
+    assert any(
+        "Skipped unsupported patternProperties regex '^x[0-9]+$'" in entry["text"]
+        for entry in parser.logger
+    )
 
 
 def test_parse_object_schema_drop_property_and_additional_schema():
@@ -124,15 +135,20 @@ def test_parse_object_schema_drop_property_and_additional_schema():
         "properties": {"a": {"type": "integer"}},
         "additionalProperties": False,
     }
-    assert repair_json('{"a": 1, "extra": "drop"}', schema=schema_drop, skip_json_loads=True, return_objects=True) == {
-        "a": 1
-    }
+    assert repair_json(
+        '{"a": 1, "extra": "drop"}',
+        schema=schema_drop,
+        skip_json_loads=True,
+        return_objects=True,
+    ) == {"a": 1}
 
     schema_extra = {
         "type": "object",
         "additionalProperties": {"type": "integer"},
     }
-    assert repair_json('{"a": "2"}', schema=schema_extra, skip_json_loads=True, return_objects=True) == {"a": 2}
+    assert repair_json(
+        '{"a": "2"}', schema=schema_extra, skip_json_loads=True, return_objects=True
+    ) == {"a": 2}
 
 
 def test_parse_object_schema_closing_array_bracket_and_extra_brace():
@@ -144,7 +160,9 @@ def test_parse_object_schema_closing_array_bracket_and_extra_brace():
             "required": ["a"],
         },
     }
-    assert repair_json('[{"a": 1]', schema=schema, skip_json_loads=True, return_objects=True) == [{"a": 1}]
+    assert repair_json(
+        '[{"a": 1]', schema=schema, skip_json_loads=True, return_objects=True
+    ) == [{"a": 1}]
 
     schema_obj = {"type": "object", "additionalProperties": True}
     parser = JSONParser('{"a": 1}}', None, False, 0, False, False)
@@ -173,7 +191,11 @@ def test_parse_array_schema_true_false_and_non_array():
 
 
 def test_parse_array_schema_items_and_additional_items():
-    schema_drop = {"type": "array", "items": [{"type": "integer"}], "additionalItems": False}
+    schema_drop = {
+        "type": "array",
+        "items": [{"type": "integer"}],
+        "additionalItems": False,
+    }
     assert parse_array_direct("[1, 2]", schema_drop) == [1]
 
     schema_extra = {
@@ -263,10 +285,16 @@ def test_schema_ref_to_true_short_circuits():
 def test_parse_array_salvage_mode_parses_even_when_item_schema_would_fail():
     schema = {"type": "array", "items": {"type": "integer"}}
     # In salvage mode parse_array should not fail early on schema mismatch.
-    assert parse_array_direct_with_mode('["bad", "2"]', schema, "salvage") == ["bad", "2"]
+    assert parse_array_direct_with_mode('["bad", "2"]', schema, "salvage") == [
+        "bad",
+        "2",
+    ]
 
 
 def test_parse_array_salvage_mode_keeps_object_heuristic_values():
-    schema = {"type": "array", "items": {"type": "object", "properties": {"a": {"type": "integer"}}}}
+    schema = {
+        "type": "array",
+        "items": {"type": "object", "properties": {"a": {"type": "integer"}}},
+    }
     # In salvage mode, string+colon heuristic should still parse and keep the object value.
     assert parse_array_direct_with_mode('["a": 1]', schema, "salvage") == [{"a": 1}]

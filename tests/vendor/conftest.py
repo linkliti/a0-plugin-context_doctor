@@ -26,9 +26,16 @@ if "src" not in sys.modules:
 sys.modules["src.json_repair"] = _vr
 
 _submodules = [
-    "json_repair", "json_parser", "parse_string", "parse_object",
-    "parse_array", "parse_number", "parse_comment", "schema_repair",
-    "parser_schema", "parser_parenthesized",
+    "json_repair",
+    "json_parser",
+    "parse_string",
+    "parse_object",
+    "parse_array",
+    "parse_number",
+    "parse_comment",
+    "schema_repair",
+    "parser_schema",
+    "parser_parenthesized",
 ]
 for sub in _submodules:
     full = f"src.json_repair.{sub}"

@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from .json_parser import JSONParser
 
 
-def parse_comment(self: "JSONParser") -> JSONReturnType:
+def parse_comment(self: "JSONParser", record_top_level_value: bool = False) -> JSONReturnType:
     """
     Parse code-like comments:
 
@@ -55,9 +55,7 @@ def parse_comment(self: "JSONParser") -> JSONReturnType:
                 while True:
                     char = self.get_char_at()
                     if not char:
-                        self.log(
-                            "Reached end-of-string while parsing block comment; unclosed block comment."
-                        )
+                        self.log("Reached end-of-string while parsing block comment; unclosed block comment.")
                         break
                     comment += char
                     self.index += 1
@@ -74,6 +72,6 @@ def parse_comment(self: "JSONParser") -> JSONReturnType:
             self.skip_whitespaces()
             if self.get_char_at() in ["#", "/"]:
                 continue
-            return self.parse_json()
+            return self.parse_json(record_top_level_value=record_top_level_value)
         break
     return ""

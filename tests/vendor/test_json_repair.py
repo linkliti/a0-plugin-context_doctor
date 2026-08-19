@@ -14,27 +14,46 @@ def test_valid_json():
         repair_json('{"name": "John", "age": 30, "city": "New York"}')
         == '{"name": "John", "age": 30, "city": "New York"}'
     )
-    assert repair_json('{"employees":["John", "Anna", "Peter"]} ') == '{"employees": ["John", "Anna", "Peter"]}'
+    assert (
+        repair_json('{"employees":["John", "Anna", "Peter"]} ')
+        == '{"employees": ["John", "Anna", "Peter"]}'
+    )
     assert repair_json('{"key": "value:value"}') == '{"key": "value:value"}'
-    assert repair_json('{"text": "The quick brown fox,"}') == '{"text": "The quick brown fox,"}'
-    assert repair_json('{"text": "The quick brown fox won\'t jump"}') == '{"text": "The quick brown fox won\'t jump"}'
+    assert (
+        repair_json('{"text": "The quick brown fox,"}')
+        == '{"text": "The quick brown fox,"}'
+    )
+    assert (
+        repair_json('{"text": "The quick brown fox won\'t jump"}')
+        == '{"text": "The quick brown fox won\'t jump"}'
+    )
     assert repair_json('{"key": ""') == '{"key": ""}'
-    assert repair_json('{"key1": {"key2": [1, 2, 3]}}') == '{"key1": {"key2": [1, 2, 3]}}'
-    assert repair_json('{"key": 12345678901234567890}') == '{"key": 12345678901234567890}'
+    assert (
+        repair_json('{"key1": {"key2": [1, 2, 3]}}') == '{"key1": {"key2": [1, 2, 3]}}'
+    )
+    assert (
+        repair_json('{"key": 12345678901234567890}') == '{"key": 12345678901234567890}'
+    )
     assert repair_json('{"key": "value\u263a"}') == '{"key": "value\\u263a"}'
     assert repair_json('{"key": "value\\nvalue"}') == '{"key": "value\\nvalue"}'
 
 
 def test_valid_json_fast_path_does_not_initialize_repair_parser(monkeypatch):
     def fail_parser_initialization(*_args, **_kwargs):
-        raise AssertionError("valid JSON fast path should not initialize the repair parser")
+        raise AssertionError(
+            "valid JSON fast path should not initialize the repair parser"
+        )
 
     monkeypatch.setattr(json_repair_module, "JSONParser", fail_parser_initialization)
 
-    assert json_repair_module.repair_json('{"key": "value"}', return_objects=True) == {"key": "value"}
+    assert json_repair_module.repair_json('{"key": "value"}', return_objects=True) == {
+        "key": "value"
+    }
 
 
-def test_prefixed_valid_json_uses_value_fast_path_when_json_loads_is_skipped(monkeypatch):
+def test_prefixed_valid_json_uses_value_fast_path_when_json_loads_is_skipped(
+    monkeypatch,
+):
     raw = 'Here is your JSON:\n{"text": "a\\n b c, floof: a\\n ... a b (c), floof: \\n a", "id": 8}'
     expected = {"text": "a\n b c, floof: a\n ... a b (c), floof: \n a", "id": 8}
     original_try_parse = JSONParser._try_parse_valid_json_value
@@ -71,22 +90,34 @@ def test_prefixed_valid_json_with_trailing_text_uses_value_fast_path(monkeypatch
 
 
 def test_prefixed_invalid_json_falls_back_to_repair_parser():
-    assert repair_json('Here is your JSON: {"key": "value', return_objects=True) == {"key": "value"}
+    assert repair_json('Here is your JSON: {"key": "value', return_objects=True) == {
+        "key": "value"
+    }
 
 
 def test_multiple_jsons():
     assert repair_json("[]{}") == "[]"
     assert repair_json('[]{"key":"value"}') == '{"key": "value"}'
-    assert repair_json('{"key":"value"}[1,2,3,True]') == '[{"key": "value"}, [1, 2, 3, true]]'
-    assert repair_json('{"key":"value"}, {"key":"value_after"}', return_objects=True) == [
+    assert (
+        repair_json('{"key":"value"}[1,2,3,True]')
+        == '[{"key": "value"}, [1, 2, 3, true]]'
+    )
+    assert repair_json(
+        '{"key":"value"}, {"key":"value_after"}', return_objects=True
+    ) == [
         {"key": "value"},
         {"key": "value_after"},
     ]
     assert (
-        repair_json('lorem ```json {"key":"value"} ``` ipsum ```json [1,2,3,True] ``` 42')
+        repair_json(
+            'lorem ```json {"key":"value"} ``` ipsum ```json [1,2,3,True] ``` 42'
+        )
         == '[{"key": "value"}, [1, 2, 3, true]]'
     )
-    assert repair_json('[{"key":"value"}][{"key":"value_after"}]') == '[{"key": "value_after"}]'
+    assert (
+        repair_json('[{"key":"value"}][{"key":"value_after"}]')
+        == '[{"key": "value_after"}]'
+    )
 
 
 def test_top_level_separator_detects_pending_comma():
@@ -146,20 +177,24 @@ def test_repair_json_with_objects():
     # Test with valid JSON strings
     assert repair_json("[]", return_objects=True) == []
     assert repair_json("{}", return_objects=True) == {}
-    assert repair_json('{"key": true, "key2": false, "key3": null}', return_objects=True) == {
+    assert repair_json(
+        '{"key": true, "key2": false, "key3": null}', return_objects=True
+    ) == {
         "key": True,
         "key2": False,
         "key3": None,
     }
-    assert repair_json('{"name": "John", "age": 30, "city": "New York"}', return_objects=True) == {
+    assert repair_json(
+        '{"name": "John", "age": 30, "city": "New York"}', return_objects=True
+    ) == {
         "name": "John",
         "age": 30,
         "city": "New York",
     }
     assert repair_json("[1, 2, 3, 4]", return_objects=True) == [1, 2, 3, 4]
-    assert repair_json('{"employees":["John", "Anna", "Peter"]} ', return_objects=True) == {
-        "employees": ["John", "Anna", "Peter"]
-    }
+    assert repair_json(
+        '{"employees":["John", "Anna", "Peter"]} ', return_objects=True
+    ) == {"employees": ["John", "Anna", "Peter"]}
     assert repair_json(
         """
 {
@@ -211,7 +246,9 @@ def test_repair_json_with_objects():
     assert repair_json(
         '{\n"html": "<h3 id="aaa">Waarom meer dan 200 Technical Experts - "Passie voor techniek"?</h3>"}',
         return_objects=True,
-    ) == {"html": '<h3 id="aaa">Waarom meer dan 200 Technical Experts - "Passie voor techniek"?</h3>'}
+    ) == {
+        "html": '<h3 id="aaa">Waarom meer dan 200 Technical Experts - "Passie voor techniek"?</h3>'
+    }
     assert repair_json(
         """
         [
@@ -280,7 +317,10 @@ def test_repair_json_normalizes_real_parser_recursion_error():
 
 
 def test_ensure_ascii():
-    assert repair_json("{'test_中国人_ascii':'统一码'}", ensure_ascii=False) == '{"test_中国人_ascii": "统一码"}'
+    assert (
+        repair_json("{'test_中国人_ascii':'统一码'}", ensure_ascii=False)
+        == '{"test_中国人_ascii": "统一码"}'
+    )
 
 
 def test_stream_stable():
@@ -290,14 +330,24 @@ def test_stream_stable():
     assert repair_json('{"key": "val\\', stream_stable=False) == '{"key": "val\\\\"}'
     assert repair_json('{"key": "val\\n', stream_stable=False) == '{"key": "val"}'
     assert (
-        repair_json('{"key": "val\\n123,`key2:value2', stream_stable=False) == '{"key": "val\\n123", "key2": "value2"}'
+        repair_json('{"key": "val\\n123,`key2:value2', stream_stable=False)
+        == '{"key": "val\\n123", "key2": "value2"}'
     )
-    assert repair_json('{"key": "val\\n123,`key2:value2`"}', stream_stable=True) == '{"key": "val\\n123,`key2:value2`"}'
+    assert (
+        repair_json('{"key": "val\\n123,`key2:value2`"}', stream_stable=True)
+        == '{"key": "val\\n123,`key2:value2`"}'
+    )
     # stream_stable = True
     assert repair_json('{"key": "val\\', stream_stable=True) == '{"key": "val"}'
     assert repair_json('{"key": "val\\n', stream_stable=True) == '{"key": "val\\n"}'
-    assert repair_json('{"key": "val\\n123,`key2:value2', stream_stable=True) == '{"key": "val\\n123,`key2:value2"}'
-    assert repair_json('{"key": "val\\n123,`key2:value2`"}', stream_stable=True) == '{"key": "val\\n123,`key2:value2`"}'
+    assert (
+        repair_json('{"key": "val\\n123,`key2:value2', stream_stable=True)
+        == '{"key": "val\\n123,`key2:value2"}'
+    )
+    assert (
+        repair_json('{"key": "val\\n123,`key2:value2`"}', stream_stable=True)
+        == '{"key": "val\\n123,`key2:value2`"}'
+    )
 
 
 def test_logging():

@@ -71,12 +71,7 @@ def parenthesized_is_explicit_tuple(parser: "JSONParser") -> bool:
             braces += 1
         elif ch == "}" and braces > 0:
             braces -= 1
-        elif (
-            ch == ","
-            and nested_parentheses == 0
-            and square_brackets == 0
-            and braces == 0
-        ):
+        elif ch == "," and nested_parentheses == 0 and square_brackets == 0 and braces == 0:
             return True
 
         i += 1
@@ -105,13 +100,13 @@ def top_level_parenthesized_can_start_value(parser: "JSONParser") -> bool:
     if first_inner_char is None:
         return False
 
+    inner_text = parser.json_str[parser.index + idx :].lower()
     if (
         first_inner_char not in [")", "{", "[", "(", *STRING_DELIMITERS]
         and not first_inner_char.isdigit()
         and first_inner_char not in ["-", "."]
-        and parser.json_str[parser.index + idx : parser.index + idx + 4]
-        not in ["true", "null"]
-        and parser.json_str[parser.index + idx : parser.index + idx + 5] != "false"
+        and inner_text[:4] not in ["true", "null", "none"]
+        and inner_text[:5] != "false"
     ):
         return False
 

@@ -33,10 +33,7 @@ class ObjectComparer:  # pragma: no cover
             if not isinstance(obj2, list) or len(obj1) != len(obj2):
                 return False
             # Recursively compare each item
-            return all(
-                ObjectComparer.is_same_object(obj1[i], obj2[i])
-                for i in range(len(obj1))
-            )
+            return all(ObjectComparer.is_same_object(obj1[i], obj2[i]) for i in range(len(obj1)))
 
         # For atomic values: types already match, so return True
         return True

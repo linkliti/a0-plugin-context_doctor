@@ -29,12 +29,7 @@ from pathlib import Path
 from typing import Any, Literal, TextIO, overload
 
 from .json_parser import JSONParser
-from .schema_repair import (
-    SchemaRepairer,
-    load_schema_model,
-    normalize_schema_repair_mode,
-    schema_from_input,
-)
+from .schema_repair import SchemaRepairer, load_schema_model, normalize_schema_repair_mode, schema_from_input
 from .utils.constants import JSONReturnType
 
 
@@ -160,11 +155,7 @@ def repair_json(
             repair_log = parser.logger
     schema_obj = schema_from_input(schema) if schema is not None else None
     repairer = (
-        SchemaRepairer(
-            schema_obj,
-            repair_log if logging else None,
-            schema_repair_mode=schema_repair_mode,
-        )
+        SchemaRepairer(schema_obj, repair_log if logging else None, schema_repair_mode=schema_repair_mode)
         if schema_obj is not None
         else None
     )
@@ -184,18 +175,14 @@ def repair_json(
                         try:
                             # repair_value may mutate containers in place; if validate fails we still
                             # fall back to parser.parse_with_schema, which fully replaces parsed_json.
-                            repaired_value = repairer.repair_value(
-                                parsed_json, schema_obj, "$"
-                            )
+                            repaired_value = repairer.repair_value(parsed_json, schema_obj, "$")
                             if repairer.is_valid(repaired_value, schema_obj):
                                 parsed_json = repaired_value
                                 is_valid_json = True
                         except ValueError:
                             pass
                 except RecursionError as exc:
-                    raise ValueError(
-                        "Input schema nesting exceeds the supported schema recursion depth."
-                    ) from exc
+                    raise ValueError("Input schema nesting exceeds the supported schema recursion depth.") from exc
             else:
                 is_valid_json = True
     except (json.JSONDecodeError, TypeError, ValueError):
@@ -220,16 +207,12 @@ def repair_json(
                     parsed_json = parser.parse_with_schema(repairer, schema_obj)
                     repairer.validate(parsed_json, schema_obj)
                 except RecursionError as exc:
-                    raise ValueError(
-                        "Input schema nesting exceeds the supported schema recursion depth."
-                    ) from exc
+                    raise ValueError("Input schema nesting exceeds the supported schema recursion depth.") from exc
             else:
                 # Otherwise, we can skip the more expensive schema-aware parsing and just do a normal parse.
                 parsed_json = parser.parse()
         except RecursionError as exc:
-            raise ValueError(
-                "Input nesting exceeds the supported parser recursion depth."
-            ) from exc
+            raise ValueError("Input nesting exceeds the supported parser recursion depth.") from exc
 
     # It's useful to return the actual object instead of the json string,
     # it allows this lib to be a replacement of the json library
@@ -447,22 +430,14 @@ def cli(inline_args: list[str] | None = None) -> int:
         sys.exit(1)
 
     if args.schema and args.schema_model:
-        print(
-            "Error: You cannot pass both --schema and --schema-model", file=sys.stderr
-        )
+        print("Error: You cannot pass both --schema and --schema-model", file=sys.stderr)
         sys.exit(1)
 
     if args.strict and (args.schema or args.schema_model):
-        print(
-            "Error: --strict cannot be used with --schema or --schema-model",
-            file=sys.stderr,
-        )
+        print("Error: --strict cannot be used with --schema or --schema-model", file=sys.stderr)
         sys.exit(1)
     if args.schema_repair_mode == "salvage" and not (args.schema or args.schema_model):
-        print(
-            "Error: --schema-repair-mode salvage requires --schema or --schema-model",
-            file=sys.stderr,
-        )
+        print("Error: --schema-repair-mode salvage requires --schema or --schema-model", file=sys.stderr)
         sys.exit(1)
 
     ensure_ascii = args.ensure_ascii

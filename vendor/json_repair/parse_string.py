@@ -1,10 +1,7 @@
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, cast
 
-from .parse_string_helpers.object_value_context import (
-    classify_object_value_comma,
-    update_inline_container_stack,
-)
+from .parse_string_helpers.object_value_context import classify_object_value_comma, update_inline_container_stack
 from .parse_string_helpers.parse_boolean_or_null import parse_boolean_or_null
 from .parse_string_helpers.parse_json_llm_block import parse_json_llm_block
 from .utils.constants import STRING_DELIMITERS, JSONReturnType
@@ -31,9 +28,7 @@ class StringParseState:
     pending_inline_container: bool = False
     inline_container_stack: list[str] = field(default_factory=list)
     object_value_has_no_future_delimiter: bool = False
-    lookahead_cache: dict[tuple[str, ...], tuple[int, int | None]] = field(
-        default_factory=dict
-    )
+    lookahead_cache: dict[tuple[str, ...], tuple[int, int | None]] = field(default_factory=dict)
     object_value_unmatched_opening_braces: int = 0
     regex_character_class_start: int | None = None
 
@@ -213,12 +208,9 @@ def _prepare_string_entry(
         state.lstring_delimiter = "“"
         state.rstring_delimiter = "”"
     elif char.isalnum():
-        if (
-            char.lower() in ["t", "f", "n"]
-            and self.context.current != ContextValues.OBJECT_KEY
-        ):
-            value = parse_boolean_or_null(self)
-            if value != "":
+        if char.lower() in ["t", "f", "n"] and self.context.current != ContextValues.OBJECT_KEY:
+            found_literal, value = parse_boolean_or_null(self)
+            if found_literal:
                 return state, value
         self.log(
             "While parsing a string, we found a literal instead of a quote",
@@ -237,18 +229,9 @@ def _prepare_string_entry(
 
     if self.get_char_at() == state.lstring_delimiter:
         if (
-            (
-                self.context.current == ContextValues.OBJECT_KEY
-                and self.get_char_at(1) == ":"
-            )
-            or (
-                self.context.current == ContextValues.OBJECT_VALUE
-                and self.get_char_at(1) in [",", "}"]
-            )
-            or (
-                self.context.current == ContextValues.ARRAY
-                and self.get_char_at(1) in [",", "]"]
-            )
+            (self.context.current == ContextValues.OBJECT_KEY and self.get_char_at(1) == ":")
+            or (self.context.current == ContextValues.OBJECT_VALUE and self.get_char_at(1) in [",", "}"])
+            or (self.context.current == ContextValues.ARRAY and self.get_char_at(1) in [",", "]"])
         ):
             self.index += 1
             return state, ""
@@ -334,18 +317,14 @@ def _normalize_escape_sequence(
     if char in ["u", "x"]:
         num_chars = 4 if char == "u" else 2
         next_chars = self.json_str[self.index + 1 : self.index + 1 + num_chars]
-        if len(next_chars) == num_chars and all(
-            c in "0123456789abcdefABCDEF" for c in next_chars
-        ):
+        if len(next_chars) == num_chars and all(c in "0123456789abcdefABCDEF" for c in next_chars):
             self.log("Found a unicode escape sequence, normalizing it")
             state.string_acc = state.string_acc[:-1] + chr(int(next_chars, 16))
             _rebuild_unmatched_opening_braces(state)
             self.index += 1 + num_chars
             return True, self.get_char_at()
     elif char == "„" or char in STRING_DELIMITERS and char != active_rstring_delimiter:
-        self.log(
-            "Found a delimiter that was escaped but shouldn't be escaped, removing the escape"
-        )
+        self.log("Found a delimiter that was escaped but shouldn't be escaped, removing the escape")
         state.string_acc = state.string_acc[:-1] + char
         _rebuild_unmatched_opening_braces(state)
         self.index += 1
@@ -371,9 +350,7 @@ def _brace_before_code_fence_belongs_to_string(
             quote_search_idx = container_end_idx
 
     outer_rstring_delimiter = _outer_rstring_delimiter(state)
-    quote_idx = self.skip_to_character(
-        character=outer_rstring_delimiter, idx=quote_search_idx
-    )
+    quote_idx = self.skip_to_character(character=outer_rstring_delimiter, idx=quote_search_idx)
     while self.get_char_at(quote_idx) == outer_rstring_delimiter:
         after_quote_idx = self.scroll_whitespaces(idx=quote_idx + 1)
         after_quote = self.get_char_at(after_quote_idx)
@@ -381,9 +358,7 @@ def _brace_before_code_fence_belongs_to_string(
             if keep_post_fence_container:
                 state.pending_inline_container = True
             return True
-        quote_idx = self.skip_to_character(
-            character=outer_rstring_delimiter, idx=quote_idx + 1
-        )
+        quote_idx = self.skip_to_character(character=outer_rstring_delimiter, idx=quote_idx + 1)
     return False
 
 
@@ -420,12 +395,8 @@ def _post_fence_container_starts_next_member(
     if after_container != ",":
         return False
 
-    next_member_idx = _scroll_comment_prefixed_member_start(
-        self, after_container_idx + 1
-    )
-    return self.get_char_at(next_member_idx) in ["}", None] or _object_member_starts_at(
-        self, next_member_idx
-    )
+    next_member_idx = _scroll_comment_prefixed_member_start(self, after_container_idx + 1)
+    return self.get_char_at(next_member_idx) in ["}", None] or _object_member_starts_at(self, next_member_idx)
 
 
 def _starts_nested_inline_container(
@@ -447,16 +418,9 @@ def _starts_nested_inline_container(
             next_idx = self.scroll_whitespaces(idx=idx + 1)
             next_char = self.get_char_at(next_idx)
             if opening_delimiter in ["[", "("]:
-                return next_char in [
-                    "]",
-                    ")",
-                    *STRING_DELIMITERS,
-                    "-",
-                    *INLINE_CONTAINER_OPENERS,
-                    "t",
-                    "f",
-                    "n",
-                ] or (next_char is not None and next_char.isdigit())
+                return next_char in ["]", ")", *STRING_DELIMITERS, "-", *INLINE_CONTAINER_OPENERS, "t", "f", "n"] or (
+                    next_char is not None and next_char.isdigit()
+                )
             if opening_delimiter != "{":
                 return False
             if next_char in ["}", *STRING_DELIMITERS]:
@@ -485,10 +449,7 @@ def _skip_inline_container(
             i = self.skip_to_character(character=end_delimiter, idx=i + 1)
             if self.get_char_at(i) != end_delimiter:
                 return None
-        elif (
-            char in INLINE_CONTAINER_CLOSING_DELIMITERS
-            and _starts_nested_inline_container(self, i)
-        ):
+        elif char in INLINE_CONTAINER_CLOSING_DELIMITERS and _starts_nested_inline_container(self, i):
             stack.append(INLINE_CONTAINER_CLOSING_DELIMITERS[char])
         elif char == stack[-1]:
             stack.pop()
@@ -559,9 +520,7 @@ def _object_member_starts_at(
     next_member = self.get_char_at(next_member_idx)
     if next_member in STRING_DELIMITERS:
         key_end_delimiter = _matching_string_delimiter(next_member)
-        key_end_idx = self.skip_to_character(
-            character=key_end_delimiter, idx=next_member_idx + 1
-        )
+        key_end_idx = self.skip_to_character(character=key_end_delimiter, idx=next_member_idx + 1)
         if self.get_char_at(key_end_idx) != key_end_delimiter:
             return False
         after_key_idx = self.scroll_whitespaces(idx=key_end_idx + 1)
@@ -624,11 +583,7 @@ def _handle_right_delimiter_candidate(
             (ContextValues.OBJECT_KEY in self.context.context and next_c in [":", "}"])
             or (ContextValues.OBJECT_VALUE in self.context.context and next_c == "}")
             or (ContextValues.ARRAY in self.context.context and next_c in ["]", ","])
-            or (
-                check_comma_in_object_value
-                and self.context.current == ContextValues.OBJECT_VALUE
-                and next_c == ","
-            )
+            or (check_comma_in_object_value and self.context.current == ContextValues.OBJECT_VALUE and next_c == ",")
         ):
             break
         i += 1
@@ -648,8 +603,7 @@ def _handle_right_delimiter_candidate(
             return True, next_char, False
     elif next_c == outer_rstring_delimiter and self.get_char_at(i - 1) != "\\":
         if _only_whitespace_until(self, i) and not (
-            self.context.current == ContextValues.OBJECT_VALUE
-            and _quoted_object_member_follows(self, i)
+            self.context.current == ContextValues.OBJECT_VALUE and _quoted_object_member_follows(self, i)
         ):
             return False, char, True
         if self.context.current == ContextValues.OBJECT_VALUE:
@@ -663,10 +617,7 @@ def _handle_right_delimiter_candidate(
             i += 1
             next_c = self.get_char_at(i)
             while next_c and next_c != ":":
-                if next_c in [",", "]", "}"] or (
-                    next_c == outer_rstring_delimiter
-                    and self.get_char_at(i - 1) != "\\"
-                ):
+                if next_c in [",", "]", "}"] or (next_c == outer_rstring_delimiter and self.get_char_at(i - 1) != "\\"):
                     break
                 i += 1
                 next_c = self.get_char_at(i)
@@ -680,16 +631,12 @@ def _handle_right_delimiter_candidate(
         elif self.context.current == ContextValues.ARRAY:
             even_delimiters = next_c == outer_rstring_delimiter
             while next_c == outer_rstring_delimiter:
-                i = self.skip_to_character(
-                    character=[outer_rstring_delimiter, "]"], idx=i + 1
-                )
+                i = self.skip_to_character(character=[outer_rstring_delimiter, "]"], idx=i + 1)
                 next_c = self.get_char_at(i)
                 if next_c != outer_rstring_delimiter:
                     even_delimiters = False
                     break
-                i = self.skip_to_character(
-                    character=[outer_rstring_delimiter, "]"], idx=i + 1
-                )
+                i = self.skip_to_character(character=[outer_rstring_delimiter, "]"], idx=i + 1)
                 next_c = self.get_char_at(i)
             if even_delimiters:
                 self.log(
@@ -721,9 +668,7 @@ def _scan_string_body(
     char = self.get_char_at()
     while char and (char != outer_rstring_delimiter or _in_low_smart_quote_span(state)):
         if state.missing_quotes:
-            if self.context.current == ContextValues.OBJECT_KEY and (
-                char == ":" or char.isspace()
-            ):
+            if self.context.current == ContextValues.OBJECT_KEY and (char == ":" or char.isspace()):
                 self.log(
                     "While parsing a string missing the left delimiter in object key context, we found a :, stopping here",
                 )
@@ -748,9 +693,7 @@ def _scan_string_body(
                     self.context.current == ContextValues.OBJECT_VALUE
                     and char == "{"
                     and self.get_char_at(-1) != "\\"
-                    and _bare_key_is_followed_by_colon(
-                        self, self.scroll_whitespaces(idx=1)
-                    )
+                    and _bare_key_is_followed_by_colon(self, self.scroll_whitespaces(idx=1))
                 )
             )
             and char in INLINE_CONTAINER_OPENERS
@@ -763,9 +706,7 @@ def _scan_string_body(
                 )
                 state.pending_inline_container = False
                 state.inline_container_stack.clear()
-                _append_string_content(
-                    state, self.json_str[self.index : self.index + container_end_idx]
-                )
+                _append_string_content(state, self.json_str[self.index : self.index + container_end_idx])
                 self.index += container_end_idx
                 char = self.get_char_at()
                 continue
@@ -797,12 +738,10 @@ def _scan_string_body(
             )
             char = _append_literal_char(self, state, char)
             continue
-        state.pending_inline_container, keep_inline_container_char = (
-            update_inline_container_stack(
-                char,
-                state.pending_inline_container,
-                state.inline_container_stack,
-            )
+        state.pending_inline_container, keep_inline_container_char = update_inline_container_stack(
+            char,
+            state.pending_inline_container,
+            state.inline_container_stack,
         )
         if keep_inline_container_char:
             char = _append_literal_char(self, state, char)
@@ -811,9 +750,7 @@ def _scan_string_body(
             not self.stream_stable
             and self.context.current == ContextValues.OBJECT_VALUE
             and char == "}"
-            and (
-                not state.string_acc or state.string_acc[-1] != outer_rstring_delimiter
-            )
+            and (not state.string_acc or state.string_acc[-1] != outer_rstring_delimiter)
         ):
             if state.object_value_unmatched_opening_braces:
                 char = _append_literal_char(self, state, char)
@@ -858,9 +795,7 @@ def _scan_string_body(
             not self.stream_stable
             and char == "]"
             and ContextValues.ARRAY in self.context.context
-            and (
-                not state.string_acc or state.string_acc[-1] != outer_rstring_delimiter
-            )
+            and (not state.string_acc or state.string_acc[-1] != outer_rstring_delimiter)
         ):
             i = self.skip_to_character(outer_rstring_delimiter)
             if not self.get_char_at(i):
@@ -868,11 +803,7 @@ def _scan_string_body(
         if self.context.current == ContextValues.OBJECT_VALUE and char == "}":
             i = self.scroll_whitespaces(idx=1)
             next_c = self.get_char_at(i)
-            if (
-                next_c == "`"
-                and self.get_char_at(i + 1) == "`"
-                and self.get_char_at(i + 2) == "`"
-            ):
+            if next_c == "`" and self.get_char_at(i + 1) == "`" and self.get_char_at(i + 2) == "`":
                 if _brace_before_code_fence_belongs_to_string(self, state, i):
                     self.log(
                         "While parsing a string in object value context, we found a literal fenced snippet after }, keeping it in the string",
@@ -901,11 +832,7 @@ def _scan_string_body(
             handled_escape, char = _normalize_escape_sequence(self, state, char)
             if handled_escape:
                 continue
-        if (
-            char == ":"
-            and not state.missing_quotes
-            and self.context.current == ContextValues.OBJECT_KEY
-        ):
+        if char == ":" and not state.missing_quotes and self.context.current == ContextValues.OBJECT_KEY:
             i = self.skip_to_character(character=state.lstring_delimiter, idx=1)
             next_c = self.get_char_at(i)
             if next_c:
@@ -941,15 +868,9 @@ def _scan_string_body(
             assert char is not None
             char = _append_literal_char(self, state, char)
             continue
-        if (
-            char == outer_rstring_delimiter
-            and state.string_acc
-            and state.string_acc[-1] != "\\"
-        ):
+        if char == outer_rstring_delimiter and state.string_acc and state.string_acc[-1] != "\\":
             assert char is not None
-            handled_delimiter, char, should_break = _handle_right_delimiter_candidate(
-                self, state, char
-            )
+            handled_delimiter, char, should_break = _handle_right_delimiter_candidate(self, state, char)
             if should_break:
                 break
             if handled_delimiter:
@@ -963,12 +884,7 @@ def _finalize_string_result(
     char: str | None,
 ) -> str:
     outer_rstring_delimiter = _outer_rstring_delimiter(state)
-    if (
-        char
-        and state.missing_quotes
-        and self.context.current == ContextValues.OBJECT_KEY
-        and char.isspace()
-    ):
+    if char and state.missing_quotes and self.context.current == ContextValues.OBJECT_KEY and char.isspace():
         self.log(
             "While parsing a string, handling an extreme corner case in which the LLM added a comment instead of valid string, invalidate the string and return an empty value",
         )
@@ -985,9 +901,7 @@ def _finalize_string_result(
     else:
         self.index += 1
 
-    if not self.stream_stable and (
-        state.missing_quotes or (state.string_acc and state.string_acc[-1] == "\n")
-    ):
+    if not self.stream_stable and (state.missing_quotes or (state.string_acc and state.string_acc[-1] == "\n")):
         state.string_acc = state.string_acc.rstrip()
 
     return state.string_acc
