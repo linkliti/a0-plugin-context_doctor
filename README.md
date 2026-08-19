@@ -45,13 +45,16 @@ context_doctor/
 ├── plugin.yaml
 ├── default_config.yaml
 ├── helpers/context_doctor.py          # repair_and_beautify, transform_response, build_heading, update_log_item, schema
-├── vendor/json_repair/                # bundled, no pip
+├── vendor/json_repair/                # bundled v0.63.3, no pip
 ├── extensions/python/
 │   ├── response_stream_end/_20_context_doctor.py
+│   ├── _functions/agent/Agent/hist_add_ai_response/end/_05_store_last_response.py
 │   ├── _functions/agent/Agent/hist_add_ai_response/end/_20_context_doctor.py
+│   ├── _functions/agent/Agent/hist_add_warning/start/_10_suppress_empty_response_warnings.py
 │   └── tool_execute_before/_30_context_doctor.py
 ├── webui/config.html
-└── tests/                             # unit + integration + e2e (366 tests)
+├── tests/                             # unit + integration + e2e (92 tests)
+│   └── vendor/                        # upstream json_repair suite (302 tests)
 ```
 
 ## Install

@@ -1,1 +1,1 @@
-https://github.com/mangiucugna/json_repair 0.63.2
+https://github.com/mangiucugna/json_repair 0.63.3
